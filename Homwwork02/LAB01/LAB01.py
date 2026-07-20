@@ -166,7 +166,7 @@ print(f"   MAE: {mae_multiple_test:.4f}")
 print(f"   R² Score: {r2_multiple_test:.4f}")
 
 # Feature importance (coefficients)
-print(f"\n🔍 Top 5 Most Important Features (by coefficient magnitude):")
+print(f"\n🔍 Top 10 Most Important Features (by coefficient magnitude):")
 feature_importance = pd.DataFrame({
     'Feature': X_all.columns,
     'Coefficient': model_multiple.coef_
@@ -196,54 +196,36 @@ best_model = "Multiple LR" if r2_multiple_test > r2_simple_test else "Simple LR"
 print(f"\n✨ Best Model: {best_model}")
 
 # ============================================================
-# 8. VISUALIZATIONS
+# 8. VISUALIZATIONS - SINGLE PLOT
 # ============================================================
 print("\n" + "=" * 60)
-print("CREATING VISUALIZATIONS...")
+print("CREATING VISUALIZATION...")
 print("=" * 60)
 
-plt.style.use('seaborn-v0_8-darkgrid')
-fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-fig.suptitle('LAB 1: Linear Regression - Age Prediction', fontsize=16, fontweight='bold')
+plt.style.use('seaborn-v0_8-whitegrid')
+fig, ax = plt.subplots(figsize=(11, 8))
 
-# Plot 1: Simple Linear Regression
-axes[0, 0].scatter(X_test_simple, y_test, alpha=0.5, label='Actual', s=30)
-axes[0, 0].plot(X_test_simple, y_pred_simple_test, color='red', linewidth=2, label='Prediction')
-axes[0, 0].set_xlabel('Stress Level')
-axes[0, 0].set_ylabel('Age')
-axes[0, 0].set_title(f'Simple Linear Regression (R² = {r2_simple_test:.4f})')
-axes[0, 0].legend()
-axes[0, 0].grid(True, alpha=0.3)
+# Scatter plot
+scatter = ax.scatter(y_test, y_pred_multiple_test, alpha=0.65, s=60, 
+                     color='#4ECDC4', edgecolors='navy', linewidth=0.7)
 
-# Plot 2: Multiple Linear Regression - Actual vs Predicted
-axes[0, 1].scatter(y_test, y_pred_multiple_test, alpha=0.5, s=30)
-axes[0, 1].plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 
-                'r--', lw=2, label='Perfect Prediction')
-axes[0, 1].set_xlabel('Actual Age')
-axes[0, 1].set_ylabel('Predicted Age')
-axes[0, 1].set_title(f'Multiple LR: Actual vs Predicted (R² = {r2_multiple_test:.4f})')
-axes[0, 1].legend()
-axes[0, 1].grid(True, alpha=0.3)
+# Perfect prediction line
+ax.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], 
+        'r--', lw=2.5, label='Perfect Prediction', zorder=5)
 
-# Plot 3: Residuals Distribution
-residuals = y_test - y_pred_multiple_test
-axes[1, 0].hist(residuals, bins=30, edgecolor='black', alpha=0.7, color='skyblue')
-axes[1, 0].axvline(x=0, color='red', linestyle='--', linewidth=2)
-axes[1, 0].set_xlabel('Residuals')
-axes[1, 0].set_ylabel('Frequency')
-axes[1, 0].set_title('Residuals Distribution (Multiple LR)')
-axes[1, 0].grid(True, alpha=0.3)
+# Labels & Title
+ax.set_xlabel('Actual Age (years)', fontsize=13, fontweight='bold')
+ax.set_ylabel('Predicted Age (years)', fontsize=13, fontweight='bold')
+ax.set_title(f'Multiple LR: Actual vs Predicted (R² = {r2_multiple_test:.4f})', 
+             fontsize=14, fontweight='bold', pad=20)
 
-# Plot 4: Model Comparison
-models = ['Simple LR', 'Multiple LR']
-test_rmse = [rmse_simple_test, rmse_multiple_test]
-colors = ['#FF6B6B', '#4ECDC4']
-axes[1, 1].bar(models, test_rmse, color=colors, alpha=0.7, edgecolor='black')
-axes[1, 1].set_ylabel('Test RMSE')
-axes[1, 1].set_title('Model Comparison: Test RMSE')
-axes[1, 1].grid(True, alpha=0.3, axis='y')
-for i, v in enumerate(test_rmse):
-    axes[1, 1].text(i, v + 0.1, f'{v:.4f}', ha='center', fontweight='bold')
+# Statistics text box
+textstr = f'RMSE: {rmse_multiple_test:.4f}\nMAE: {mae_multiple_test:.4f}\nTest Size: {len(y_test)}'
+ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=11,
+        verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+
+ax.legend(fontsize=12, loc='lower right')
+ax.grid(True, alpha=0.3, linestyle='--')
 
 plt.tight_layout()
 plt.savefig('lab1_results.png', dpi=300, bbox_inches='tight')
