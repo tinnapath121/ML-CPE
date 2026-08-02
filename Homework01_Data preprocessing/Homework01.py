@@ -86,4 +86,3 @@ for c in ['PassengerId','Name','Ticket','Cabin']:
 # บันทึกไฟล์ที่ผ่านการเข้ารหัสแล้ว
 df.to_csv(out_encoded, index=False)
 print("Saved encoded CSV to:", out_encoded)
-print("test")
