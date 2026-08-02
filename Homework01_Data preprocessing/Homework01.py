@@ -5,13 +5,14 @@ from pathlib import Path #lab4
 
 
 #lab1
-df = pd.read_csv(r'C:\Users\ketar\ML-CPE\Homework01_Data preprocessing\Titanic-Dataset.csv') #Titanic-Dataset.csv commitไปปลอดภัยไหมอาจารบอกด้วยพอดีคอมมันหาไฟล์ไม่เจอ
+df = pd.read_csv(r'C:\Users\ketar\ML-CPE\Homework01_Data preprocessing\Titanic-Dataset.csv') #Titanic-Dataset.csv pushไปปลอดภัยไหมอาจารบอกด้วยพอดีคอมมันหาไฟล์ไม่เจอ
 print("Shape:", df.shape)
 print(df.dtypes)
 print(df.describe(include='all'))
 print("Missing per column:\n", df.isnull().sum())
 print("Duplicate rows:", df.duplicated().sum())
 print("Survived distribution:\n", df['Survived'].value_counts(normalize=True))
+
 
 #lab2
 # Histogram
@@ -25,6 +26,7 @@ corr = df[num_cols].corr()
 plt.figure(figsize=(8,6))
 sns.heatmap(corr, annot=True, fmt=".2f", cmap='coolwarm')
 plt.show()
+
 
 #lab3
 df['Age'] = df['Age'].fillna(df['Age'].median())
@@ -42,6 +44,7 @@ IQR = Q3 - Q1
 lower, upper = Q1 - 1.5*IQR, Q3 + 1.5*IQR
 df['Fare_clipped'] = df['Fare'].clip(lower, upper)
 
+
 #lab4
 base = Path(__file__).parent
 input_csv = base / 'Titanic-Dataset.csv'   # ปรับพาธถ้าจำเป็น
@@ -52,7 +55,6 @@ df = pd.read_csv(input_csv)
 df['Age'] = pd.to_numeric(df.get('Age'), errors='coerce').fillna(df['Age'].median())
 df['Fare'] = pd.to_numeric(df.get('Fare'), errors='coerce').fillna(df['Fare'].median())
 df['Embarked'] = df['Embarked'].fillna(df['Embarked'].mode().iloc[0]) if 'Embarked' in df.columns else df.get('Embarked')
-
 df['FamilySize'] = df.get('SibSp', 0).fillna(0).astype(int) + df.get('Parch', 0).fillna(0).astype(int) + 1
 df['HasCabin'] = df['Cabin'].notnull().astype(int) if 'Cabin' in df.columns else 0
 
@@ -84,3 +86,4 @@ for c in ['PassengerId','Name','Ticket','Cabin']:
 # บันทึกไฟล์ที่ผ่านการเข้ารหัสแล้ว
 df.to_csv(out_encoded, index=False)
 print("Saved encoded CSV to:", out_encoded)
+print("test")
