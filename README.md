@@ -1,4 +1,4 @@
-<p align="left">
+<p align="center">
 ### Homework ML-CPE
 </p>
 <p align="left">
