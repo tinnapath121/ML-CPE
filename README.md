@@ -5,7 +5,10 @@
 <img width="159" height="200"  alt="cat" src="https://github.com/user-attachments/assets/3fa54279-e390-4162-92b9-c7e26285d31c" /> &nbsp;
 <img width="150" height="200"  alt="sleepy-cat-stupid-cat" src="https://github.com/user-attachments/assets/b8c94cd2-8afa-4634-89ed-0717c4e822a7" />&nbsp;
 <img width="150" height="200" alt="ok-cat-okay-cat" src="https://github.com/user-attachments/assets/cc1aff8b-de3f-4db8-8c07-c54ebee05c88" />
- <span style="color:green; font-size:20px;">ข้อความสีเขียว ขนาดใหญ่</span>
+<font color="red">ข้อความสีแดง</font>
+<font color="blue">ข้อความสีน้ำเงิน</font>
+<font color="#FF5733">ข้อความสีส้ม (Hex)</font>
+
 
  </p>
 
