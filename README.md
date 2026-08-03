@@ -1,4 +1,5 @@
 #Homework for ML-CPE 
 
 
-<img width="474" height="316" alt="OIP" src="https://github.com/user-attachments/assets/68878e2c-cfe7-472e-8e65-3985504f6e81" />
+<img width="159" height="200" alt="cat" src="https://github.com/user-attachments/assets/3fa54279-e390-4162-92b9-c7e26285d31c" />
+
