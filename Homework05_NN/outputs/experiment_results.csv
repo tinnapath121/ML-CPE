@@ -1,10 +1,16 @@
 Configuration,Hidden Layers,Epochs,Test Accuracy (%)
-Small (1 Layer),[64],10,58.5
-Small (1 Layer),[64],20,60.0
-Small (1 Layer),[64],30,61.0
-Medium (2 Layers),"[128, 64]",10,60.0
-Medium (2 Layers),"[128, 64]",20,55.0
-Medium (2 Layers),"[128, 64]",30,55.0
-Large (3 Layers),"[256, 128, 64]",10,59.75
-Large (3 Layers),"[256, 128, 64]",20,59.25
-Large (3 Layers),"[256, 128, 64]",30,58.75
+Small (1 Layer),[64],10,54.17
+Small (1 Layer),[64],20,54.17
+Small (1 Layer),[64],30,53.67
+Small (1 Layer),[64],40,53.0
+Small (1 Layer),[64],50,55.67
+Medium (2 Layers),"[128, 64]",10,54.0
+Medium (2 Layers),"[128, 64]",20,52.17
+Medium (2 Layers),"[128, 64]",30,52.17
+Medium (2 Layers),"[128, 64]",40,53.33
+Medium (2 Layers),"[128, 64]",50,53.17
+Large (3 Layers),"[256, 128, 64]",10,54.33
+Large (3 Layers),"[256, 128, 64]",20,52.67
+Large (3 Layers),"[256, 128, 64]",30,54.17
+Large (3 Layers),"[256, 128, 64]",40,53.33
+Large (3 Layers),"[256, 128, 64]",50,53.0

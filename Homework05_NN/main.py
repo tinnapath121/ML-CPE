@@ -17,7 +17,7 @@ OUTPUT_DIR = os.path.join(BASE_DIR, "outputs")
 IMG_SIZE = 100
 TEST_SIZE = 0.2
 VAL_SIZE = 0.1
-MAX_PER_CLASS = 1000
+MAX_PER_CLASS = 1500
 BATCH_SIZE = 32
 
 def main():
@@ -40,7 +40,7 @@ def main():
         "Medium (2 Layers)": [128, 64],
         "Large (3 Layers)": [256, 128, 64]
     }
-    epochs_to_test = [10, 20, 30]
+    epochs_to_test = [10, 20, 30, 40, 50]
 
     results = []
 
