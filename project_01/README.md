@@ -45,7 +45,14 @@ mask_project/
 * **Dataset**: Face-Mask-Detection dataset (chandrikadeb7)
 * **Link**: https://github.com/chandrikadeb7/Face-Mask-Detection
 * ใช้ภาพทั้งหมดในชุดข้อมูล: `with_mask` 2,162 ภาพ + `without_mask` 1,930 ภาพ = **4,092 ภาพ**
-* โฟลเดอร์ `dataset/` **ไม่ได้แนบมาด้วย** (ไฟล์ใหญ่เกินไป ~170MB) — โมเดลที่เทรนเสร็จแล้วอยู่ใน `outputs/svm_model.pkl` และ `outputs/scaler.pkl` พร้อมใช้งานได้เลยโดยไม่ต้องเทรนใหม่ ถ้าต้องการเทรนใหม่ ให้ clone dataset จากลิงก์ด้านบนมาไว้ที่ `dataset/with_mask/` และ `dataset/without_mask/`
+* dataset แนบมาเป็นไฟล์เดียว `dataset.zip` (17MB) — แตกไฟล์ด้วย:
+  ```bash
+  python extract_dataset.py
+  ```
+  จะได้ `dataset/with_mask/` (2,165 ภาพ) และ `dataset/without_mask/` (1,930 ภาพ) กลับมาครบ (ใช้เฉพาะตอนจะเทรนใหม่เท่านั้น)
+* `dataset.zip` เป็น**สำเนาที่ย่อขนาดแล้ว** (ย่อด้านยาวสุดเหลือ 160px, JPEG q85) จากต้นฉบับ 163MB ให้เหลือ 17MB เพื่อให้เก็บไว้กับโปรเจกต์ได้ — ไม่กระทบผลลัพธ์เพราะ pipeline ย่อทุกภาพเหลือ 100×100 grayscale อยู่แล้ว (ตรวจสอบแล้ว: เทรนใหม่จากไฟล์นี้ได้ test set 819 ภาพเท่าเดิม, accuracy 84.0% เทียบกับ 84.62% ของต้นฉบับ) ถ้าต้องการภาพความละเอียดเต็ม ดาวน์โหลดจากลิงก์ด้านบน
+* **ถ้าแค่จะใช้งาน/สาธิต ไม่ต้องแตก dataset เลย** — โมเดลที่เทรนเสร็จแล้วอยู่ใน `outputs/svm_model.pkl` + `outputs/scaler.pkl` พร้อมใช้งานทันที
+* ไฟล์ `dataset_part*.zip` และโฟลเดอร์ `dataset/` ถูกใส่ไว้ใน `.gitignore` แล้ว จะไม่ถูก push ขึ้น GitHub (ใหญ่เกินไป)
 
 ## Setup
 

@@ -1,5 +1,6 @@
-# Dataset ต้นฉบับ (ใหญ่เกินไป ~170MB) — ดูวิธีโหลดใน README
+# Dataset ต้นฉบับ (ใหญ่เกินไป ~170MB) — แตกจาก dataset.zip ด้วย extract_dataset.py
 dataset/
+dataset.zip
 
 # ไฟล์ตัวกลางที่สร้างใหม่ได้จาก main.py (ใหญ่ ไม่ต้อง push)
 outputs/*.npy
