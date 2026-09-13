@@ -1,0 +1,22 @@
+# Dataset ต้นฉบับ (ใหญ่เกินไป ~170MB) — ดูวิธีโหลดใน README
+dataset/
+
+# ไฟล์ตัวกลางที่สร้างใหม่ได้จาก main.py (ใหญ่ ไม่ต้อง push)
+outputs/*.npy
+outputs/live_prediction.jpg
+
+# รูปทดสอบส่วนตัวที่วางเอง (เก็บเฉพาะไฟล์อธิบาย)
+test_photos/*
+!test_photos/*.txt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
