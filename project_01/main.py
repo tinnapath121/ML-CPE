@@ -14,7 +14,7 @@ DATA_PATH = "dataset"
 OUTPUT_DIR = "outputs"
 IMG_SIZE = 100
 TEST_SIZE = 0.2
-MAX_PER_CLASS = 500   # None = use all images
+MAX_PER_CLASS = None   # None = use all images
 
 
 def main():
