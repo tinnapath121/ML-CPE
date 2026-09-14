@@ -13,8 +13,8 @@
 ```text
 mask_project/
 ├── dataset/                       # ภาพแบ่งตามคลาส (ไม่ได้แนบมาด้วย ดูหัวข้อ Dataset)
-│   ├── with_mask/                   # 2,162 ภาพ
-│   └── without_mask/                # 1,930 ภาพ
+│   ├── with_mask/                   
+│   └── without_mask/                
 ├── demo_photos/                   # ภาพทดสอบ "ใช้งานจริง" — ไม่ได้อยู่ใน dataset ฝึก/test เลย
 │   ├── test_unseen_*.jpg              # ภาพต้นฉบับ
 │   └── pred_test_unseen_*_v2.jpg      # ผลทำนาย (bounding box + label)
