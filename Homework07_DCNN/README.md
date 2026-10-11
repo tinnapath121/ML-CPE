@@ -27,7 +27,7 @@ ML-08-DCNN/
     ├── README.md               # คู่มือติดตั้ง/รัน/ปัญหาที่พบบ่อย
     ├── compare_gpu.py          # สคริปต์หลักของใบงาน (PyTorch, ใช้การ์ดจอ)
     ├── compare.py              # เวอร์ชัน TensorFlow ลอจิกเดียวกัน
-    ├── data/                   # CIFAR-10 (ดาวน์โหลดอัตโนมัติ)
+    ├── data/                   # CIFAR-10 (ดาวน์โหลดอัตโนมัติ, ไม่อัปขึ้น GitHub)
     ├── outputs_cifar10_gpu/    # ผลลัพธ์ของการรันจริง
     │   ├── results.csv
     │   ├── summary.txt
@@ -49,7 +49,7 @@ python compare_gpu.py --quick
 python compare_gpu.py
 ```
 
-ชุดข้อมูล: CIFAR-10 แบ่ง train 40,000 / validation 10,000 / test 10,000 (seed 42) ทำ standardize ด้วย mean/std ของชุด train
+ชุดข้อมูล: CIFAR-10 (ไม่ได้อัปขึ้น GitHub เพราะไฟล์ใหญ่เกิน 100 MB ผู้ที่รัน `compare_gpu.py` จะได้ข้อมูลดาวน์โหลดเองอัตโนมัติ) แบ่ง train 40,000 / validation 10,000 / test 10,000 (seed 42) ทำ standardize ด้วย mean/std ของชุด train
 รายละเอียดเพิ่มเติมอยู่ใน `mini-proj/README.md`
 
 หน้า 2 จาก 3
