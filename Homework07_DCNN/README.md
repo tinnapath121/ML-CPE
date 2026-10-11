@@ -74,8 +74,7 @@ python compare_gpu.py
 - คลาสที่ทำนายยากที่สุดคือ cat (67.2%) และ bird (73.1%) ส่วนง่ายที่สุดคือ truck (94.9%)
 - ข้อจำกัด: เทรนรอบเดียว (seed 42) ผลอาจต่างเล็กน้อยเมื่อเปลี่ยน seed หรืออุปกรณ์
 
-## ภาคผนวก: โปรเจกต์ Cat vs Dog (สรุปจาก README เดิม)
-
+## ภาคผนวก
 > หมายเหตุ: README เดิมอ้างโฟลเดอร์ `classification/` แต่โฟลเดอร์จริงชื่อ `mini-proj/` และโฟลเดอร์ข้อมูล `PetImages` ไม่ได้อยู่ในที่เก็บนี้
 
 Build a DCNN based on the VGG architecture using Python for image classification. The project covers image loading, preprocessing, dataset splitting, DCNN (VGG) model training, evaluation, and Cat and Dog classification
