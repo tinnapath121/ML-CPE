@@ -1,0 +1,16 @@
+# ข้อมูล BDD100K (ขนาดใหญ่ ไม่ส่ง) - เก็บเฉพาะ dataset/data.yaml
+dataset/train/
+dataset/val/
+dataset/test/
+*.cache
+
+# ผลการรันทดลองของตนเอง (ไม่ส่ง)
+runs/detect/runs/speedtest*/
+runs/detect/runs/bdd100k_v2*/
+
+# โมเดลพื้นฐานที่ Ultralytics ดาวน์โหลดอัตโนมัติ (ไม่ส่ง)
+yolov8n.pt
+/weights/
+
+# ไฟล์ชั่วคราวของ Python
+__pycache__/
