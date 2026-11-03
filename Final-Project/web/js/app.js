@@ -1,11 +1,13 @@
 // app.js — ควบคุมหน้าจอทั้งหมด
 // สแกน: กล้อง -> ตรวจจับใบหน้า -> ลายใบหน้า 128 ค่า -> (1) โมเดลตรวจแมสของเรา (2) 1-NN เทียบผู้ลงทะเบียน
 // ผ่านเมื่อ: จำหน้าได้ (ระยะ < เกณฑ์) และ สวมหน้ากาก
-import { loadFaceApi, analyzeFace, distance, startCamera } from "./face.js";
-import { loadModel } from "./model.js";
-import { people, log, identify } from "./store.js";
+import { loadFaceApi, analyzeFace, distance, startCamera } from "./face.js?v=4";
+import { loadModel } from "./model.js?v=4";
+import { people, log, identify } from "./store.js?v=4";
 
-const $ = (id) => document.getElementById(id);
+// ถ้าหา element ไม่เจอ (เช่น เบราว์เซอร์ยังจำ HTML เวอร์ชันเก่า) คืนตัวหลอกแทน null เพื่อไม่ให้ทั้งแอปพัง
+const dummy = new Proxy(function () {}, { get: (t, k) => (k === "classList" ? { toggle() {}, add() {}, remove() {} } : k === "querySelector" ? () => dummy : k === "dataset" ? {} : ""), set: () => true });
+const $ = (id) => document.getElementById(id) || (console.warn("missing element #" + id), dummy);
 const video = $("video"), canvas = $("canvas"), ctx = canvas.getContext("2d");
 
 let maskModel = null, cfg = { match_threshold: 0.5, mask_threshold: 0.5 };
@@ -20,7 +22,7 @@ const SCAN_EVERY_MS = 250;
   try {
     const [backend, m, c] = await Promise.all([
       loadFaceApi((s) => ($("overlay").textContent = s)),
-      loadModel("model/mask_model.json"),
+      loadModel("model/mask_model.json?v=4"),
       fetch("model/config.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
     ]);
     maskModel = m; if (c) cfg = { ...cfg, ...c };

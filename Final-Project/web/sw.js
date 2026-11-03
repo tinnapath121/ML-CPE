@@ -1,6 +1,6 @@
 // sw.js — เก็บไฟล์ไว้ในเครื่อง ให้แอปเปิดได้แม้เน็ตในห้องไม่ดี (หลังเปิดครั้งแรกแล้ว)
 // ไฟล์ของเรา: network-first · ไลบรารี/โมเดลจาก CDN (ระบุเวอร์ชันตายตัว): cache-first
-const CACHE = "mask-checkin-v2";
+const CACHE = "mask-checkin-v4";
 const LOCAL = ["./", "index.html", "css/style.css", "manifest.webmanifest",
   "js/app.js", "js/face.js", "js/model.js", "js/store.js", "model/mask_model.json", "model/config.json"];
 
@@ -19,6 +19,7 @@ self.addEventListener("fetch", (e) => {
   if (url.hostname === "cdn.jsdelivr.net") {
     e.respondWith(caches.match(e.request).then((hit) => hit || fetch(e.request).then(save)));
   } else if (url.origin === location.origin) {
-    e.respondWith(fetch(e.request).then(save).catch(() => caches.match(e.request)));
+    // cache: no-cache = ถามเซิร์ฟเวอร์ทุกครั้งว่ามีเวอร์ชันใหม่ไหม กันไฟล์เก่า/ใหม่ปนกันหลังอัปเดตเว็บ
+    e.respondWith(fetch(e.request, { cache: "no-cache" }).then(save).catch(() => caches.match(e.request, { ignoreSearch: true })));
   }
 });

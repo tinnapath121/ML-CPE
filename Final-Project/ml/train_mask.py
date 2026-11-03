@@ -186,28 +186,56 @@ def main():
         if per is not None:
             rep += ["\n### รายรูป (MLP)\n", per.to_markdown(index=False), "\n"]
 
-    # D) ข้อมูลจากกล้องมือถือจริง (รวมท่าเอามือปิดปาก) — ทดสอบแบบ Leave-One-Person-Out
-    #    เทรน = ข้อมูลสาธารณะ + มือถือของคนอื่น, ทดสอบ = มือถือของคนที่ไม่ได้อยู่ในชุดเทรน
+    # D) ข้อมูลจากกล้องมือถือจริง (รวมท่าเอามือปิดปาก = hand_cover)
+    #    ข้อมูลมือถือมีน้อยมากเทียบกับ dataset สาธารณะ จึงเพิ่มน้ำหนักด้วยการทำซ้ำแถว (oversampling)
+    def with_phone(train_idx):
+        tr = np.asarray(train_idx)
+        ph = tr[phone[tr]]
+        if len(ph) == 0:
+            return tr
+        k = max(1, int(0.15 * (~phone[tr]).sum() / len(ph)))          # ให้ข้อมูลมือถือ ≈ 15% ของชุดเทรน
+        extra = [ph] * (k - 1) + [ph[y[ph] == "hand_cover"]] * (2 * k)  # hand_cover มีเฉพาะจากมือถือ เพิ่มอีก
+        return np.concatenate([tr] + extra)
+
+    public = ~real & ~phone
     if phone.sum():
-        persons = sorted(df.person[phone].unique())
+        persons = sorted(df.person[phone].dropna().unique())
         rep += [f"\n## D) ข้อมูลกล้องมือถือ {int(phone.sum())} เฟรม · คน {persons}\n",
                 df[phone].groupby(["person", "label"]).size().unstack(fill_value=0).to_markdown(), "\n"]
+        # D0) ก่อนแก้: โมเดลที่เทรนจาก dataset สาธารณะอย่างเดียว ทำนายท่ามือปิดปากว่าอะไร
+        m0 = models()["MLP (deploy บนเว็บ)"].fit(X[public], y[public]); p0 = m0.predict(X[phone])
+        hc = y[phone] == "hand_cover"
+        rep += ["\n### D0) ก่อนเพิ่มข้อมูลมือถือ (เทรนจาก dataset สาธารณะอย่างเดียว)\n",
+                f"- ท่ามือปิดปาก {int(hc.sum())} เฟรม ถูกทายว่า **สวมหน้ากาก {np.mean(p0[hc] == 'with_mask')*100:.0f}%** ← ปัญหาที่เจอ\n",
+                f"- ท่าสวม/ไม่สวมหน้ากากจากมือถือ ทายถูก {np.mean(p0[~hc] == y[phone][~hc])*100:.0f}% ({int((~hc).sum())} เฟรม)\n"]
+        # D1) หลังเพิ่มข้อมูล: แบ่งทดสอบข้อมูลมือถือ
+        idx = np.where(phone)[0]
+        rows = []
         if len(persons) >= 2:
-            rows = []
-            for name, m in models().items():
-                yp = np.empty(phone.sum(), dtype=object); idx = np.where(phone)[0]
-                for per in persons:
-                    test = idx[(df.person.values[idx] == per)]
-                    train = np.where(~real & ~(phone & (df.person.values == per)))[0]
-                    m.fit(X[train], y[train]); yp[np.isin(idx, test)] = m.predict(X[test])
-                rows.append({"Model": name, **scores(y[phone], yp)})
-                if name.startswith("MLP"):
-                    plot_cm(y[phone], yp, os.path.join(a.results, "cm_phone.png"), "MLP — phone, leave-one-person-out")
-            rep += ["\n### Leave-One-Person-Out\n", pd.DataFrame(rows).to_markdown(index=False, floatfmt=".3f"), "\n"]
+            groups, how = df.person.values[idx], "Leave-One-Person-Out (ทดสอบกับคนที่ไม่อยู่ในชุดเทรน)"
+            splits = [(idx[groups != g], idx[groups == g]) for g in persons]
+        else:
+            how = "Stratified 5-fold บนเฟรมมือถือ (คนเดียว/รอบอัดเดียว → ผลจะดีเกินจริง ต้องเก็บคนที่ 2 มาทดสอบ)"
+            cv5 = StratifiedKFold(min(5, int(pd.Series(y[idx]).value_counts().min())), shuffle=True, random_state=SEED)
+            splits = [(idx[a_], idx[b_]) for a_, b_ in cv5.split(idx, y[idx])]
+        for name, m in models().items():
+            yp = np.empty(len(idx), dtype=object)
+            for tr_ph, te in splits:
+                tr = with_phone(np.concatenate([np.where(public)[0], tr_ph]))
+                m.fit(X[tr], y[tr]); yp[np.isin(idx, te)] = m.predict(X[te])
+            hc_as_mask = np.mean(yp[hc] == "with_mask") if hc.any() else float("nan")
+            rows.append({"Model": name, **scores(y[phone], yp), "มือปิดปาก→ทายว่าแมส": hc_as_mask})
+            if name.startswith("MLP"):
+                plot_cm(y[phone], yp, os.path.join(a.results, "cm_phone.png"), "MLP — phone data")
+        rep += [f"\n### D1) หลังเพิ่มข้อมูลมือถือ — {how}\n", pd.DataFrame(rows).to_markdown(index=False, floatfmt=".3f"), "\n"]
 
-    # เทรนตัวจริงด้วยข้อมูลทั้งหมด (ไม่รวมรูปจริง 4 รูป เพื่อเก็บไว้เป็นชุดทดสอบ)
-    final = models()["MLP (deploy บนเว็บ)"].fit(X[~real], y[~real])
+    # เทรนตัวจริง: dataset สาธารณะ + ข้อมูลมือถือ (เพิ่มน้ำหนัก) ไม่รวมรูปจริง 4 รูป (เก็บไว้ทดสอบ)
+    tr = with_phone(np.where(~real)[0])
+    final = models()["MLP (deploy บนเว็บ)"].fit(X[tr], y[tr])
     export_mlp(final, os.path.join(a.web, "mask_model.json"))
+    if real.any():
+        pr = final.predict(X[real])
+        rep += [f"\n### โมเดลที่ deploy ทดสอบรูปจริง 4 รูป: ถูก {int((pr == y[real]).sum())}/{int(real.sum())}\n"]
 
     ft = face_threshold(df, a.images, os.path.join(a.results, "face_distance.png"))
     cfg = {"match_threshold": ft["threshold"] if ft else 0.5, "mask_threshold": 0.5}
