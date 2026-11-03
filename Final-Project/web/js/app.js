@@ -1,9 +1,9 @@
 // app.js — ควบคุมหน้าจอทั้งหมด
 // สแกน: กล้อง -> ตรวจจับใบหน้า -> ลายใบหน้า 128 ค่า -> (1) โมเดลตรวจแมสของเรา (2) 1-NN เทียบผู้ลงทะเบียน
 // ผ่านเมื่อ: จำหน้าได้ (ระยะ < เกณฑ์) และ สวมหน้ากาก
-import { loadFaceApi, analyzeFace, distance, startCamera } from "./face.js?v=6";
-import { loadModel } from "./model.js?v=6";
-import { people, log, identify } from "./store.js?v=6";
+import { loadFaceApi, analyzeFace, distance, startCamera } from "./face.js?v=7";
+import { loadModel } from "./model.js?v=7";
+import { people, log, identify } from "./store.js?v=7";
 
 // ถ้าหา element ไม่เจอ (เช่น เบราว์เซอร์ยังจำ HTML เวอร์ชันเก่า) คืนตัวหลอกแทน null เพื่อไม่ให้ทั้งแอปพัง
 const dummy = new Proxy(function () {}, { get: (t, k) => (k === "classList" ? { toggle() {}, add() {}, remove() {} } : k === "querySelector" ? () => dummy : k === "dataset" ? {} : ""), set: () => true });
@@ -40,6 +40,7 @@ async function openCam(mode) {
   camMode = mode;
   try {
     await startCamera(video, mode);
+    $("btnCamFront").hidden = true;   // กล้องเปิดแล้ว เหลือแค่ปุ่มสลับกล้อง ไม่บังภาพ
     video.classList.toggle("mirror", mode === "user");
     canvas.classList.toggle("mirror", mode === "user");
     loop();
@@ -231,12 +232,19 @@ function resetReg(clearForm) {
 // ---------- ประวัติ / พนักงาน ----------
 const RESULT_TH = { checked_in: "เข้างาน ✓", denied_no_mask: "ไม่สวมหน้ากาก ✗" };
 const fmt = (t) => (t ? new Date(t).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" }) : "–");
-const cell = (tr, t) => tr.append(Object.assign(document.createElement("td"), { textContent: t }));
+// data-label = หัวคอลัมน์ ใช้แสดงเป็นการ์ดบนจอมือถือ (ดู table.list ใน style.css)
+const cell = (tr, t) => {
+  const td = Object.assign(document.createElement("td"), { textContent: t });
+  const th = tr.closest("table")?.querySelectorAll("thead th")[tr.children.length];
+  if (th) td.dataset.label = th.textContent;
+  tr.append(td); return td;
+};
 async function renderLog() {
   const tb = $("logTable").querySelector("tbody"); tb.innerHTML = "<tr><td colspan=4>กำลังโหลด…</td></tr>";
   try {
     const rows = await log.all(200); tb.innerHTML = "";
-    for (const r of rows) { const tr = document.createElement("tr"); [fmt(r.created_at), r.id, r.name, RESULT_TH[r.result] || r.result].forEach((t) => cell(tr, t)); tb.append(tr); }
+    if (!rows.length) { const td = cell(tb.insertRow(), "ยังไม่มีประวัติเข้างาน"); td.colSpan = 4; td.className = "empty"; }
+    for (const r of rows) { const tr = tb.insertRow(); [fmt(r.created_at), r.id, r.name, RESULT_TH[r.result] || r.result].forEach((t) => cell(tr, t)); }
   } catch (e) { tb.innerHTML = ""; cell(tb.insertRow(), "โหลดไม่สำเร็จ: " + e.message); }
 }
 async function renderPeople() {
@@ -247,7 +255,7 @@ async function renderPeople() {
   $("peopleEmpty").hidden = list.length > 0;
   tb.innerHTML = "";
   for (const p of list) {
-    const tr = document.createElement("tr");
+    const tr = tb.insertRow();
     [p.id, p.name, p.dept || "–", fmt(p.registered_at), fmt(p.last_checkin)].forEach((t) => cell(tr, t));
     const del = Object.assign(document.createElement("button"), { textContent: "ลบ", className: "danger" });
     del.onclick = async () => {
@@ -257,7 +265,7 @@ async function renderPeople() {
       try { await people.remove(p.id, pin); $("peopleStatus").textContent = `ลบ ${p.name} แล้ว`; renderPeople(); }
       catch (e) { $("peopleStatus").textContent = e.message; }
     };
-    const td = document.createElement("td"); td.append(del); tr.append(td); tb.append(tr);
+    const td = document.createElement("td"); td.className = "cell-action"; td.append(del); tr.append(td);
   }
 }
 $("btnGoScan").onclick = () => show("scan");

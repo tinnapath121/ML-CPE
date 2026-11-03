@@ -1,6 +1,6 @@
 // sw.js — เก็บไฟล์ไว้ในเครื่อง ให้แอปเปิดได้แม้เน็ตในห้องไม่ดี (หลังเปิดครั้งแรกแล้ว)
 // ไฟล์ของเรา: network-first · ไลบรารี/โมเดลจาก CDN (ระบุเวอร์ชันตายตัว): cache-first
-const CACHE = "mask-checkin-v6";
+const CACHE = "mask-checkin-v7";
 const LOCAL = ["./", "index.html", "css/style.css", "manifest.webmanifest",
   "js/app.js", "js/face.js", "js/model.js", "js/store.js", "model/mask_model.json", "model/config.json"];
 

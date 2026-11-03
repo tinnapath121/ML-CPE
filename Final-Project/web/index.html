@@ -2,35 +2,60 @@
 <html lang="th">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#0f172a" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1220" />
   <title>Mask Check-in</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="css/style.css?v=6" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css?v=7" />
 </head>
 <body>
-  <header>
-    <h1>Mask Check-in · สแกนหน้าเข้างาน</h1>
+  <header class="appbar">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M8 13.5c1.2 1.4 6.8 1.4 8 0v2c-1.2 1.6-6.8 1.6-8 0z"/><circle cx="9.5" cy="10" r=".6"/><circle cx="14.5" cy="10" r=".6"/></svg>
+      <div>
+        <div class="brand-name">Mask Check-in</div>
+        <div class="brand-sub">สแกนหน้าเข้างาน · ตรวจการสวมหน้ากาก</div>
+      </div>
+    </div>
   </header>
-  <nav class="tabs" role="tablist">
-    <button role="tab" data-view="scan" class="active">สแกนเข้างาน</button>
-    <button role="tab" data-view="register">ลงทะเบียน</button>
-    <button role="tab" data-view="log">ประวัติ</button>
-    <button role="tab" data-view="people">รายชื่อผู้ลงทะเบียน</button>
-    <button role="tab" data-view="collect">เก็บข้อมูล</button>
+
+  <!-- แท็บ: บนมือถือเป็นแถบล่าง บนจอใหญ่เป็นแถบบน -->
+  <nav class="tabs" role="tablist" aria-label="เมนูหลัก">
+    <button role="tab" data-view="scan" class="active">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><circle cx="12" cy="11" r="3"/><path d="M7.5 17c1-2 2.6-3 4.5-3s3.5 1 4.5 3"/></svg>
+      <span>สแกนเข้างาน</span></button>
+    <button role="tab" data-view="register">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.5 3.4-5.5 6.5-5.5 1.4 0 2.7.4 3.7 1.1M18 14v6M15 17h6"/></svg>
+      <span>ลงทะเบียน</span></button>
+    <button role="tab" data-view="log">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
+      <span>ประวัติ</span></button>
+    <button role="tab" data-view="people">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>
+      <span>รายชื่อผู้ลงทะเบียน</span></button>
+    <button role="tab" data-view="collect">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="7" ry="2.5"/><path d="M5 6v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6M5 12v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-6"/></svg>
+      <span>เก็บข้อมูล</span></button>
   </nav>
 
   <main>
-    <!-- กล้องใช้ร่วมกันระหว่างหน้าสแกนและหน้าลงทะเบียน -->
-    <section id="cameraBox">
+    <!-- กล้องใช้ร่วมกันระหว่างหน้าสแกน ลงทะเบียน และเก็บข้อมูล -->
+    <section id="cameraBox" class="camera">
       <div class="stage">
         <video id="video" playsinline muted class="mirror"></video>
         <canvas id="canvas" class="mirror"></canvas>
-        <div class="overlay-count" id="overlay" aria-live="polite">กำลังโหลด…</div>
-      </div>
-      <div class="row" style="margin-top:8px">
-        <button id="btnCamFront" class="primary">เปิดกล้อง</button>
-        <button id="btnCamSwitch">สลับกล้อง</button>
+        <div class="pill" id="overlay" aria-live="polite">กำลังโหลด…</div>
+        <div class="stage-actions">
+          <button id="btnCamFront" class="primary">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+            <span>เปิดกล้อง</span></button>
+          <button id="btnCamSwitch" class="icon-btn" aria-label="สลับกล้องหน้า/หลัง" title="สลับกล้อง">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-2.5h6L17 8h3v11H4z"/><path d="M9.5 12.5a2.5 2.5 0 0 1 4.3-1.7M14.5 13.5a2.5 2.5 0 0 1-4.3 1.7M13.5 10.5h.8V9.7M10.5 16.3h-.8v-.8"/></svg>
+            <span>สลับกล้อง</span></button>
+        </div>
       </div>
     </section>
 
@@ -40,99 +65,118 @@
         <div class="result-title">ยืนหน้ากล้อง ห่างประมาณ 50 ซม.</div>
         <div class="result-sub">ระบบจะตรวจใบหน้าและการสวมหน้ากากอัตโนมัติ</div>
       </div>
-      <div class="panel stats">
-        <div><div class="big" id="sMask">–</div><div class="label">สวมหน้ากาก</div></div>
-        <div><div class="big" id="sWho">–</div><div class="label">ระบุตัวตน</div></div>
-        <div><div class="big" id="sDist">–</div><div class="label">ระยะห่างลายหน้า</div></div>
+      <div class="stats">
+        <div class="stat"><div class="stat-label">สวมหน้ากาก</div><div class="stat-value" id="sMask">–</div></div>
+        <div class="stat"><div class="stat-label">ระบุตัวตน</div><div class="stat-value" id="sWho">–</div></div>
+        <div class="stat"><div class="stat-label">ระยะห่างลายหน้า</div><div class="stat-value" id="sDist">–</div></div>
       </div>
     </section>
 
     <!-- หน้าลงทะเบียน -->
     <section data-view="register" class="view" hidden>
-      <div class="panel">
-        <div class="row">
-          <label>รหัสพนักงาน <input id="rId" required size="10" autocomplete="off" /></label>
-          <label>ชื่อ-นามสกุล <input id="rName" required size="18" autocomplete="off" /></label>
-          <label>แผนก <input id="rDept" size="10" autocomplete="off" /></label>
+      <div class="card">
+        <h2>ข้อมูลพนักงาน</h2>
+        <div class="form-grid">
+          <label class="field"><span>รหัสพนักงาน *</span><input id="rId" required autocomplete="off" placeholder="เช่น E001" /></label>
+          <label class="field"><span>ชื่อ-นามสกุล *</span><input id="rName" required autocomplete="off" placeholder="ชื่อ นามสกุล" /></label>
+          <label class="field"><span>แผนก</span><input id="rDept" autocomplete="off" placeholder="เช่น QA" /></label>
         </div>
-        <label class="consent"><input type="checkbox" id="rConsent" />
-          ข้าพเจ้ายินยอมให้ระบบเก็บ "ลายใบหน้า" (ตัวเลขที่คำนวณจากใบหน้า ไม่ใช่รูปถ่าย) ไว้ในฐานข้อมูลของระบบ (Supabase, ภูมิภาคสิงคโปร์) เพื่อใช้ยืนยันตัวตนตอนเข้างานเท่านั้น และขอให้ผู้ดูแลลบได้ทุกเมื่อ (พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล ม.26)
+
+        <label class="consent" for="rConsent">
+          <input type="checkbox" id="rConsent" />
+          <span>ข้าพเจ้ายินยอมให้ระบบเก็บ <b>"ลายใบหน้า"</b> (ตัวเลขที่คำนวณจากใบหน้า ไม่ใช่รูปถ่าย)
+            ไว้ในฐานข้อมูลของระบบ (Supabase ภูมิภาคสิงคโปร์) เพื่อใช้ยืนยันตัวตนตอนเข้างานเท่านั้น
+            และขอให้ผู้ดูแลลบได้ทุกเมื่อ <small>(พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล ม.26)</small></span>
         </label>
+
         <ol class="steps">
-          <li id="step1">ขั้นที่ 1 — ถ่ายหน้าตรง <b>ไม่สวมหน้ากาก</b> <span id="st1">ยังไม่ได้ถ่าย</span></li>
-          <li id="step2">ขั้นที่ 2 — ถ่ายหน้าตรง <b>สวมหน้ากาก</b> <span id="st2">ยังไม่ได้ถ่าย</span></li>
+          <li id="step1"><div class="step-num">1</div><div class="step-body">ถ่ายหน้าตรง <b>ไม่สวมหน้ากาก</b><span class="chip" id="st1">ยังไม่ได้ถ่าย</span></div></li>
+          <li id="step2"><div class="step-num">2</div><div class="step-body">ถ่ายหน้าตรง <b>สวมหน้ากาก</b><span class="chip" id="st2">ยังไม่ได้ถ่าย</span></div></li>
         </ol>
-        <div class="row">
+        <div class="actions">
           <button id="btnShot1" class="primary">ถ่ายขั้นที่ 1</button>
           <button id="btnShot2" class="primary" disabled>ถ่ายขั้นที่ 2</button>
-          <button id="btnSave" disabled>บันทึกการลงทะเบียน</button>
-          <button id="btnRegReset">เริ่มใหม่</button>
+          <button id="btnSave" class="success" disabled>บันทึกการลงทะเบียน</button>
+          <button id="btnRegReset" class="ghost">เริ่มใหม่</button>
         </div>
-        <p class="status" id="regStatus"></p>
+        <p class="status" id="regStatus" aria-live="polite"></p>
       </div>
     </section>
 
     <!-- ประวัติ -->
     <section data-view="log" class="view" hidden>
-      <div class="panel">
-        <div class="row">
+      <div class="card">
+        <div class="card-head">
+          <h2>ประวัติเข้างาน</h2>
           <button id="btnCsv" class="primary">ดาวน์โหลด CSV</button>
-          <label>PIN ผู้ดูแล <input id="logPin" type="password" inputmode="numeric" size="8" autocomplete="off" /></label>
-          <button id="btnLogClear" class="danger">ล้างประวัติ</button>
         </div>
-        <p class="status" id="logStatus"></p>
-        <table id="logTable"><thead><tr><th>เวลา</th><th>รหัส</th><th>ชื่อ</th><th>ผล</th></tr></thead><tbody></tbody></table>
+        <table id="logTable" class="list"><thead><tr><th>เวลา</th><th>รหัส</th><th>ชื่อ</th><th>ผล</th></tr></thead><tbody></tbody></table>
+        <details class="admin">
+          <summary>สำหรับผู้ดูแล</summary>
+          <div class="admin-row">
+            <label class="field"><span>PIN ผู้ดูแล</span><input id="logPin" type="password" inputmode="numeric" autocomplete="off" /></label>
+            <button id="btnLogClear" class="danger">ล้างประวัติทั้งหมด</button>
+          </div>
+        </details>
+        <p class="status" id="logStatus" aria-live="polite"></p>
       </div>
     </section>
 
-    <!-- พนักงาน -->
+    <!-- รายชื่อผู้ลงทะเบียน -->
     <section data-view="people" class="view" hidden>
-      <div class="panel">
-        <div class="row" style="justify-content:space-between">
-          <h2 id="peopleCount" style="margin:0;font-size:1.1rem">รายชื่อผู้ลงทะเบียน</h2>
-          <div class="row">
-            <button id="btnGoScan" class="primary">เริ่มสแกนเข้างาน</button>
-            <button id="btnGoReg">+ ลงทะเบียนใหม่</button>
+      <div class="card">
+        <div class="card-head">
+          <h2 id="peopleCount">รายชื่อผู้ลงทะเบียน</h2>
+          <div class="head-actions">
+            <button id="btnPeopleRefresh" class="ghost">รีเฟรช</button>
+            <button id="btnGoReg" class="primary">+ ลงทะเบียน</button>
           </div>
         </div>
-        <table id="peopleTable" style="margin-top:8px"><thead><tr><th>รหัส</th><th>ชื่อ</th><th>แผนก</th><th>ลงทะเบียนเมื่อ</th><th>เข้างานล่าสุด</th><th></th></tr></thead><tbody></tbody></table>
-        <p class="status" id="peopleStatus"></p>
-        <p class="status" id="peopleEmpty" hidden>ยังไม่มีผู้ลงทะเบียน — กด "+ ลงทะเบียนใหม่"</p>
-        <div class="row" style="margin-top:8px">
-          <button id="btnPeopleRefresh">รีเฟรช</button>
-          <label>PIN ผู้ดูแล (สำหรับลบ) <input id="adminPin" type="password" inputmode="numeric" size="8" autocomplete="off" /></label>
-        </div>
+        <table id="peopleTable" class="list"><thead><tr><th>รหัส</th><th>ชื่อ</th><th>แผนก</th><th>ลงทะเบียนเมื่อ</th><th>เข้างานล่าสุด</th><th></th></tr></thead><tbody></tbody></table>
+        <p class="empty" id="peopleEmpty" hidden>ยังไม่มีผู้ลงทะเบียน — กด "+ ลงทะเบียน"</p>
+        <details class="admin">
+          <summary>สำหรับผู้ดูแล (ลบรายชื่อ)</summary>
+          <div class="admin-row">
+            <label class="field"><span>PIN ผู้ดูแล</span><input id="adminPin" type="password" inputmode="numeric" autocomplete="off" /></label>
+            <p class="hint">ใส่ PIN แล้วกด "ลบ" ที่รายชื่อ จากนั้นกด "ยืนยันลบ"</p>
+          </div>
+        </details>
+        <p class="status" id="peopleStatus" aria-live="polite"></p>
+        <button id="btnGoScan" class="primary block">เริ่มสแกนเข้างาน</button>
       </div>
     </section>
 
     <!-- เก็บข้อมูลเทรนเพิ่มจากกล้องมือถือ (เก็บแค่ลายใบหน้า 128 ค่า ไม่เก็บรูป) -->
     <section data-view="collect" class="view" hidden>
-      <div class="panel">
-        <p class="status">ใช้เก็บข้อมูลเพิ่มเพื่อเทรนโมเดลใหม่ เช่น "เอามือปิดปาก" ซึ่งต้องนับเป็น<b>ไม่สวมหน้ากาก</b>
-          · เลือกท่า → กดอัด → ขยับหน้าซ้าย-ขวา-ก้ม-เงยช้าๆ จนครบเวลา · ทำทุกคน ทุกท่า หลายรอบ แล้วกดดาวน์โหลดส่งไฟล์ให้คนเทรน</p>
-        <div class="row">
-          <label>รหัสผู้ถูกเก็บ <input id="cPerson" value="p1" size="5" /></label>
-          <label>ท่า
+      <div class="card">
+        <h2>เก็บข้อมูลเทรนโมเดล</h2>
+        <p class="hint">เลือกท่า → กดอัด → ขยับหน้าซ้าย-ขวา ก้ม-เงยช้าๆ จนครบเวลา · ท่า "มือปิดปาก" นับเป็น<b>ไม่สวมหน้ากาก</b>
+          · ทำทุกคน ทุกท่า หลายรอบ แล้วดาวน์โหลดส่งให้คนเทรน</p>
+        <div class="form-grid">
+          <label class="field"><span>รหัสผู้ถูกเก็บ</span><input id="cPerson" value="p1" autocomplete="off" /></label>
+          <label class="field"><span>ท่า</span>
             <select id="cLabel">
               <option value="with_mask">สวมหน้ากาก</option>
               <option value="without_mask">ไม่สวมหน้ากาก</option>
-              <option value="hand_cover">เอามือ/ของอื่นปิดปาก (นับเป็นไม่สวม)</option>
+              <option value="hand_cover">เอามือ/ของอื่นปิดปาก</option>
             </select>
           </label>
-          <label>วินาที <input id="cSecs" type="number" value="15" min="5" max="60" size="3" /></label>
+          <label class="field"><span>ระยะเวลา (วินาที)</span><input id="cSecs" type="number" value="15" min="5" max="60" inputmode="numeric" /></label>
         </div>
-        <div class="row" style="margin-top:8px">
+        <div class="actions">
           <button id="btnRec" class="primary">● เริ่มอัด</button>
           <button id="btnCollectDl">ดาวน์โหลดข้อมูล (.jsonl)</button>
           <button id="btnCollectClear" class="danger">ล้างข้อมูลที่เก็บ</button>
         </div>
-        <table id="collectTable" style="margin-top:8px"><thead><tr><th>ท่า</th><th>จำนวนเฟรม</th></tr></thead><tbody></tbody></table>
+        <table id="collectTable" class="list compact"><thead><tr><th>ท่า</th><th>จำนวนเฟรม</th></tr></thead><tbody></tbody></table>
       </div>
     </section>
 
-    <p class="status" id="modelInfo"></p>
-    <p class="status">ภาพจากกล้องประมวลผลบนอุปกรณ์นี้เท่านั้น ไม่มีการส่งรูปออกไป · ส่งเฉพาะลายใบหน้า (ตัวเลข 128 ค่า) ไปเทียบกับฐานข้อมูล</p>
+    <footer class="foot">
+      <p id="modelInfo"></p>
+      <p>ภาพจากกล้องประมวลผลบนอุปกรณ์นี้เท่านั้น ไม่มีการส่งรูปออกไป · ส่งเฉพาะลายใบหน้า (ตัวเลข 128 ค่า) ไปเทียบกับฐานข้อมูล</p>
+    </footer>
   </main>
-  <script type="module" src="js/app.js?v=6"></script>
+  <script type="module" src="js/app.js?v=7"></script>
 </body>
 </html>
