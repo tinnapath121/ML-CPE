@@ -139,7 +139,9 @@ def main():
 
     # อ่าน features หลัก + ไฟล์ที่เก็บจากมือถือ (แท็บ "เก็บข้อมูล" บนเว็บ) ทุกไฟล์ใน data/phone/*.jsonl
     import glob
-    files = [a.features] + sorted(glob.glob(os.path.join(os.path.dirname(a.features), "phone", "*.jsonl")))
+    dd = os.path.dirname(a.features)
+    files = ([a.features] + sorted(glob.glob(os.path.join(dd, "phone", "*.jsonl")))
+             + sorted(glob.glob(os.path.join(dd, "synth", "*.jsonl"))))   # synth = มือปิดปากสังเคราะห์
     recs = [json.loads(l) for f in files for l in open(f, encoding="utf-8-sig") if l.strip()]
     df = pd.DataFrame(recs)
     if "person" not in df: df["person"] = None
@@ -156,6 +158,7 @@ def main():
     X = np.stack(df.d.values); y = df.label.values
     ds1, ds2, real = (df.src == "ds1").values, (df.src == "ds2").values, (df.src == "real").values
     phone = (df.src == "phone").values
+    synth = (df.src == "synth").values
 
     # A) 5-fold CV ใน ds1
     cv = StratifiedKFold(5, shuffle=True, random_state=SEED)
@@ -194,7 +197,7 @@ def main():
         if len(ph) == 0:
             return tr
         k = max(1, int(0.15 * (~phone[tr]).sum() / len(ph)))          # ให้ข้อมูลมือถือ ≈ 15% ของชุดเทรน
-        extra = [ph] * (k - 1) + [ph[y[ph] == "hand_cover"]] * (2 * k)  # hand_cover มีเฉพาะจากมือถือ เพิ่มอีก
+        extra = [ph] * (k - 1)  # (มีมือสังเคราะห์แล้ว ไม่ต้องเพิ่มน้ำหนัก hand_cover อีก)
         return np.concatenate([tr] + extra)
 
     public = ~real & ~phone
@@ -203,11 +206,22 @@ def main():
         rep += [f"\n## D) ข้อมูลกล้องมือถือ {int(phone.sum())} เฟรม · คน {persons}\n",
                 df[phone].groupby(["person", "label"]).size().unstack(fill_value=0).to_markdown(), "\n"]
         # D0) ก่อนแก้: โมเดลที่เทรนจาก dataset สาธารณะอย่างเดียว ทำนายท่ามือปิดปากว่าอะไร
-        m0 = models()["MLP (deploy บนเว็บ)"].fit(X[public], y[public]); p0 = m0.predict(X[phone])
+        base = public & ~synth
+        m0 = models()["MLP (deploy บนเว็บ)"].fit(X[base], y[base]); p0 = m0.predict(X[phone])
         hc = y[phone] == "hand_cover"
         rep += ["\n### D0) ก่อนเพิ่มข้อมูลมือถือ (เทรนจาก dataset สาธารณะอย่างเดียว)\n",
                 f"- ท่ามือปิดปาก {int(hc.sum())} เฟรม ถูกทายว่า **สวมหน้ากาก {np.mean(p0[hc] == 'with_mask')*100:.0f}%** ← ปัญหาที่เจอ\n",
                 f"- ท่าสวม/ไม่สวมหน้ากากจากมือถือ ทายถูก {np.mean(p0[~hc] == y[phone][~hc])*100:.0f}% ({int((~hc).sum())} เฟรม)\n"]
+        # D0.5) เพิ่มมือสังเคราะห์อย่างเดียว (ไม่ใช้ข้อมูลมือถือเลย) -> ทดสอบกับมือจริงจากมือถือ = ทดสอบภายนอกจริง
+        if synth.any():
+            rows = []
+            for name, m in models().items():
+                m.fit(X[public], y[public]); ps = m.predict(X[phone])
+                rows.append({"Model": name, **scores(y[phone], ps),
+                             "มือปิดปาก→ทายว่าแมส": float(np.mean(ps[hc] == "with_mask")) if hc.any() else float("nan"),
+                             "มือปิดปาก→ทายถูก": float(np.mean(ps[hc] == "hand_cover")) if hc.any() else float("nan")})
+            rep += [f"\n### D0.5) เทรน dataset สาธารณะ + มือสังเคราะห์ {int(synth.sum())} รูป → ทดสอบกับเฟรมมือถือจริง (ไม่เคยเห็นตอนเทรน)\n",
+                    pd.DataFrame(rows).to_markdown(index=False, floatfmt=".3f"), "\n"]
         # D1) หลังเพิ่มข้อมูล: แบ่งทดสอบข้อมูลมือถือ
         idx = np.where(phone)[0]
         rows = []

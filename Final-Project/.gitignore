@@ -7,3 +7,4 @@ ml/extract/real/
 ml/extract/model/
 ml/extract/*.wasm
 ml/extract/face-api.esm.js
+synth_preview/
