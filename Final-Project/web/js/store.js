@@ -34,11 +34,30 @@ export const log = {
   all: (limit = 200) => rpc("list_checkins", { p_limit: limit }),
   add: (e) => rpc("log_checkin", { p_id: e.id, p_result: e.result, p_mask: e.mask, p_distance: e.dist }),
   clear: (pin) => rpc("clear_checkins", { p_pin: pin }),
+  // ส่งออกประวัติเป็น CSV ที่เปิดใน Excel / Google Sheets แล้วอ่านง่าย
+  // - หัวคอลัมน์ภาษาไทย, แยกวันที่กับเวลา (เวลาไทย), เรียงจากเก่าไปใหม่, มีคอลัมน์ลำดับ
+  // - ผลลัพธ์เป็นคำไทย, ค่าความมั่นใจเป็น %, ระยะห่าง 2 ตำแหน่ง
+  // - ใส่แผนก โดยจับคู่กับรายชื่อผู้ลงทะเบียน
   async toCSV() {
-    const rows = await log.all(1000);
-    const esc = (s) => `"${String(s ?? "").replace(/"/g, '""')}"`;
-    return ["time,employee_id,name,result,mask_prob,distance",
-      ...rows.map((r) => [r.created_at, r.id, r.name, r.result, r.mask_prob, r.distance].map(esc).join(","))].join("\n");
+    const [rows, staff] = await Promise.all([log.all(1000), people.all().catch(() => [])]);
+    const dept = Object.fromEntries((staff || []).map((p) => [p.id, p.dept || ""]));
+    const RESULT = { checked_in: "เข้างาน", denied_no_mask: "ไม่ให้เข้า (ไม่สวมหน้ากาก)" };
+    const tz = { timeZone: "Asia/Bangkok" };
+    const date = (t) => new Date(t).toLocaleDateString("en-CA", tz);                     // 2026-11-05 (Excel เรียงได้)
+    const time = (t) => new Date(t).toLocaleTimeString("en-GB", { ...tz, hour12: false }); // 08:15:30
+    // กัน CSV/Formula injection (OWASP): ค่าที่ขึ้นต้นด้วย = + - @ จะถูก Excel มองเป็นสูตร
+    const safe = (v) => { const s = String(v ?? ""); return /^[=+\-@\t\r]/.test(s) ? "'" + s : s; };
+    const esc = (v) => `"${safe(v).replace(/"/g, '""')}"`;
+    // รหัสที่เป็นตัวเลขล้วน เช่น 00123 ให้ Excel แสดงเป็นข้อความ ไม่ตัดเลข 0 หน้า
+    const idCell = (id) => (/^\d+$/.test(id) ? `="${id}"` : esc(id));
+    const head = ["ลำดับ", "วันที่", "เวลา", "รหัสพนักงาน", "ชื่อ-นามสกุล", "แผนก", "ผลการตรวจ", "ความมั่นใจว่าสวมหน้ากาก (%)", "ระยะห่างใบหน้า"];
+    const body = [...rows].reverse().map((r, i) => [
+      esc(i + 1), esc(date(r.created_at)), esc(time(r.created_at)), idCell(r.id), esc(r.name), esc(dept[r.id] ?? ""),
+      esc(RESULT[r.result] || r.result),
+      esc(r.mask_prob == null ? "" : (r.mask_prob * 100).toFixed(1)),
+      esc(r.distance == null ? "" : Number(r.distance).toFixed(2)),
+    ].join(","));
+    return [head.map(esc).join(","), ...body].join("\r\n"); // CRLF ตามมาตรฐาน CSV (RFC 4180)
   },
 };
 
