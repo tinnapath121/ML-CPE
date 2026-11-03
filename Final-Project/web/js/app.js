@@ -1,9 +1,9 @@
 // app.js — ควบคุมหน้าจอทั้งหมด
 // สแกน: กล้อง -> ตรวจจับใบหน้า -> ลายใบหน้า 128 ค่า -> (1) โมเดลตรวจแมสของเรา (2) 1-NN เทียบผู้ลงทะเบียน
 // ผ่านเมื่อ: จำหน้าได้ (ระยะ < เกณฑ์) และ สวมหน้ากาก
-import { loadFaceApi, analyzeFace, distance, startCamera } from "./face.js?v=7";
-import { loadModel } from "./model.js?v=7";
-import { people, log, identify } from "./store.js?v=7";
+import { loadFaceApi, analyzeFace, distance, startCamera } from "./face.js?v=8";
+import { loadModel } from "./model.js?v=8";
+import { people, log, identify } from "./store.js?v=8";
 
 // ถ้าหา element ไม่เจอ (เช่น เบราว์เซอร์ยังจำ HTML เวอร์ชันเก่า) คืนตัวหลอกแทน null เพื่อไม่ให้ทั้งแอปพัง
 const dummy = new Proxy(function () {}, { get: (t, k) => (k === "classList" ? { toggle() {}, add() {}, remove() {} } : k === "querySelector" ? () => dummy : k === "dataset" ? {} : ""), set: () => true });
@@ -59,7 +59,9 @@ function show(v, push = true) {
   view = v;
   document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("active", b.dataset.view === v));
   document.querySelectorAll("section.view").forEach((s) => (s.hidden = s.dataset.view !== v));
-  $("cameraBox").hidden = !(v === "scan" || v === "register" || v === "collect");
+  const cam = v === "scan" || v === "register" || v === "collect";
+  $("cameraBox").hidden = !cam;
+  document.querySelector("main").classList.toggle("with-cam", cam);   // จอใหญ่: จัดกล้องซ้าย แผงขวา
   if (v === "collect") renderCollect();
   if (v === "log") renderLog();
   if (v === "people") renderPeople();
