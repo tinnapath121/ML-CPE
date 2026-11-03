@@ -16,7 +16,8 @@
     <button role="tab" data-view="scan" class="active">สแกนเข้างาน</button>
     <button role="tab" data-view="register">ลงทะเบียน</button>
     <button role="tab" data-view="log">ประวัติ</button>
-    <button role="tab" data-view="people">พนักงาน</button>
+    <button role="tab" data-view="people">ผู้ลงทะเบียน</button>
+    <button role="tab" data-view="collect">เก็บข้อมูล</button>
   </nav>
 
   <main>
@@ -28,8 +29,8 @@
         <div class="overlay-count" id="overlay" aria-live="polite">กำลังโหลด…</div>
       </div>
       <div class="row" style="margin-top:8px">
-        <button id="btnCamFront" class="primary">เปิดกล้องหน้า</button>
-        <button id="btnCamBack">กล้องหลัง</button>
+        <button id="btnCamFront" class="primary">เปิดกล้อง</button>
+        <button id="btnCamSwitch">สลับกล้อง</button>
       </div>
     </section>
 
@@ -91,6 +92,31 @@
           <button id="btnExport">สำรองข้อมูล (JSON)</button>
           <label>นำเข้า <input type="file" id="fileImport" accept="application/json" /></label>
         </div>
+      </div>
+    </section>
+
+    <!-- เก็บข้อมูลเทรนเพิ่มจากกล้องมือถือ (เก็บแค่ลายใบหน้า 128 ค่า ไม่เก็บรูป) -->
+    <section data-view="collect" class="view" hidden>
+      <div class="panel">
+        <p class="status">ใช้เก็บข้อมูลเพิ่มเพื่อเทรนโมเดลใหม่ เช่น "เอามือปิดปาก" ซึ่งต้องนับเป็น<b>ไม่สวมหน้ากาก</b>
+          · เลือกท่า → กดอัด → ขยับหน้าซ้าย-ขวา-ก้ม-เงยช้าๆ จนครบเวลา · ทำทุกคน ทุกท่า หลายรอบ แล้วกดดาวน์โหลดส่งไฟล์ให้คนเทรน</p>
+        <div class="row">
+          <label>รหัสผู้ถูกเก็บ <input id="cPerson" value="p1" size="5" /></label>
+          <label>ท่า
+            <select id="cLabel">
+              <option value="with_mask">สวมหน้ากาก</option>
+              <option value="without_mask">ไม่สวมหน้ากาก</option>
+              <option value="hand_cover">เอามือ/ของอื่นปิดปาก (นับเป็นไม่สวม)</option>
+            </select>
+          </label>
+          <label>วินาที <input id="cSecs" type="number" value="15" min="5" max="60" size="3" /></label>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button id="btnRec" class="primary">● เริ่มอัด</button>
+          <button id="btnCollectDl">ดาวน์โหลดข้อมูล (.jsonl)</button>
+          <button id="btnCollectClear" class="danger">ล้างข้อมูลที่เก็บ</button>
+        </div>
+        <table id="collectTable" style="margin-top:8px"><thead><tr><th>ท่า</th><th>จำนวนเฟรม</th></tr></thead><tbody></tbody></table>
       </div>
     </section>
 

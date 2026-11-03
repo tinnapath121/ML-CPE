@@ -34,7 +34,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 
-CLASSES = ["with_mask", "without_mask"]
+CLASSES = ["with_mask", "without_mask", "hand_cover"]  # hand_cover = มือ/ของอื่นปิดปาก (นับเป็นไม่สวม)
 SEED = 42
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -71,13 +71,14 @@ def plot_cm(y, p, path, title):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    cm = confusion_matrix(y, p, labels=CLASSES)
-    fig, ax = plt.subplots(figsize=(4.6, 4))
+    labs = [c for c in CLASSES if c in set(y) | set(p)]
+    cm = confusion_matrix(y, p, labels=labs)
+    fig, ax = plt.subplots(figsize=(1.6 * len(labs) + 1.6, 1.4 * len(labs) + 1.4))
     ax.imshow(cm, cmap="Blues")
-    ax.set_xticks([0, 1], CLASSES); ax.set_yticks([0, 1], CLASSES)
+    ax.set_xticks(range(len(labs)), labs, rotation=20); ax.set_yticks(range(len(labs)), labs)
     ax.set_xlabel("Predicted"); ax.set_ylabel("Actual"); ax.set_title(title)
-    for i in range(2):
-        for j in range(2):
+    for i in range(len(labs)):
+        for j in range(len(labs)):
             ax.text(j, i, cm[i, j], ha="center", va="center", color="white" if cm[i, j] > cm.max() / 2 else "black")
     fig.tight_layout(); fig.savefig(path, dpi=150); plt.close(fig)
 
@@ -136,7 +137,13 @@ def main():
     a = ap.parse_args()
     os.makedirs(a.web, exist_ok=True); os.makedirs(a.results, exist_ok=True)
 
-    df = pd.DataFrame([json.loads(l) for l in open(a.features, encoding="utf-8")])
+    # อ่าน features หลัก + ไฟล์ที่เก็บจากมือถือ (แท็บ "เก็บข้อมูล" บนเว็บ) ทุกไฟล์ใน data/phone/*.jsonl
+    import glob
+    files = [a.features] + sorted(glob.glob(os.path.join(os.path.dirname(a.features), "phone", "*.jsonl")))
+    recs = [json.loads(l) for f in files for l in open(f, encoding="utf-8-sig") if l.strip()]
+    df = pd.DataFrame(recs)
+    if "person" not in df: df["person"] = None
+    if "session" not in df: df["session"] = df.path
     X = np.stack(df.d.values); y = df.label.values
     rep = [f"# ผลการทดลอง ({datetime.now():%Y-%m-%d %H:%M})\n"]
 
@@ -148,6 +155,7 @@ def main():
     df = df[df.found == 1].reset_index(drop=True)
     X = np.stack(df.d.values); y = df.label.values
     ds1, ds2, real = (df.src == "ds1").values, (df.src == "ds2").values, (df.src == "real").values
+    phone = (df.src == "phone").values
 
     # A) 5-fold CV ใน ds1
     cv = StratifiedKFold(5, shuffle=True, random_state=SEED)
@@ -178,7 +186,26 @@ def main():
         if per is not None:
             rep += ["\n### รายรูป (MLP)\n", per.to_markdown(index=False), "\n"]
 
-    # เทรนตัวจริงด้วยข้อมูลสาธารณะทั้งหมด (ไม่รวมรูปจริง เพื่อเก็บไว้เป็นชุดทดสอบ)
+    # D) ข้อมูลจากกล้องมือถือจริง (รวมท่าเอามือปิดปาก) — ทดสอบแบบ Leave-One-Person-Out
+    #    เทรน = ข้อมูลสาธารณะ + มือถือของคนอื่น, ทดสอบ = มือถือของคนที่ไม่ได้อยู่ในชุดเทรน
+    if phone.sum():
+        persons = sorted(df.person[phone].unique())
+        rep += [f"\n## D) ข้อมูลกล้องมือถือ {int(phone.sum())} เฟรม · คน {persons}\n",
+                df[phone].groupby(["person", "label"]).size().unstack(fill_value=0).to_markdown(), "\n"]
+        if len(persons) >= 2:
+            rows = []
+            for name, m in models().items():
+                yp = np.empty(phone.sum(), dtype=object); idx = np.where(phone)[0]
+                for per in persons:
+                    test = idx[(df.person.values[idx] == per)]
+                    train = np.where(~real & ~(phone & (df.person.values == per)))[0]
+                    m.fit(X[train], y[train]); yp[np.isin(idx, test)] = m.predict(X[test])
+                rows.append({"Model": name, **scores(y[phone], yp)})
+                if name.startswith("MLP"):
+                    plot_cm(y[phone], yp, os.path.join(a.results, "cm_phone.png"), "MLP — phone, leave-one-person-out")
+            rep += ["\n### Leave-One-Person-Out\n", pd.DataFrame(rows).to_markdown(index=False, floatfmt=".3f"), "\n"]
+
+    # เทรนตัวจริงด้วยข้อมูลทั้งหมด (ไม่รวมรูปจริง 4 รูป เพื่อเก็บไว้เป็นชุดทดสอบ)
     final = models()["MLP (deploy บนเว็บ)"].fit(X[~real], y[~real])
     export_mlp(final, os.path.join(a.web, "mask_model.json"))
 
