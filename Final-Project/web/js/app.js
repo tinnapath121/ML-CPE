@@ -1,9 +1,9 @@
 // app.js — ควบคุมหน้าจอทั้งหมด
 // สแกน: กล้อง -> ตรวจจับใบหน้า -> ลายใบหน้า 128 ค่า -> (1) โมเดลตรวจแมสของเรา (2) 1-NN เทียบผู้ลงทะเบียน
 // ผ่านเมื่อ: จำหน้าได้ (ระยะ < เกณฑ์) และ สวมหน้ากาก
-import { loadFaceApi, analyzeFace, distance, startCamera } from "./face.js?v=4";
-import { loadModel } from "./model.js?v=4";
-import { people, log, identify } from "./store.js?v=4";
+import { loadFaceApi, analyzeFace, distance, startCamera } from "./face.js?v=6";
+import { loadModel } from "./model.js?v=6";
+import { people, log, identify } from "./store.js?v=6";
 
 // ถ้าหา element ไม่เจอ (เช่น เบราว์เซอร์ยังจำ HTML เวอร์ชันเก่า) คืนตัวหลอกแทน null เพื่อไม่ให้ทั้งแอปพัง
 const dummy = new Proxy(function () {}, { get: (t, k) => (k === "classList" ? { toggle() {}, add() {}, remove() {} } : k === "querySelector" ? () => dummy : k === "dataset" ? {} : ""), set: () => true });
@@ -75,7 +75,7 @@ function loop() {
         const f = await analyzeFace(video);
         lastFace = f;
         draw(f);
-        if (view === "scan") onScanFrame(f);
+        if (view === "scan") await onScanFrame(f);
         else if (view === "collect") onCollectFrame(f);
         else $("overlay").textContent = f ? `เจอใบหน้า · แมส ${(maskProb(f) * 100).toFixed(0)}%` : "ไม่พบใบหน้า";
       } finally { busy = false; }
@@ -97,15 +97,18 @@ function draw(f) {
 }
 
 // ---------- ตรรกะสแกนเข้างาน ----------
-function onScanFrame(f) {
+async function onScanFrame(f) {
   if (!f) { recent.length = 0; $("overlay").textContent = "ไม่พบใบหน้า — ขยับเข้ามาใกล้กล้อง"; return; }
   const pm = maskProb(f);
-  const match = identify(f.descriptor, distance);
-  recent.push({ pm, id: match && match.dist < cfg.match_threshold ? match.person.id : null, match });
+  let match;
+  try { match = await identify(f.descriptor, cfg.match_threshold); }
+  catch (e) { $("overlay").textContent = "เชื่อมต่อฐานข้อมูลไม่ได้: " + e.message; return; }
+  const known = !!(match && match.person);
+  recent.push({ pm, id: known ? match.person.id : null, match });
   if (recent.length > 4) recent.shift();
   $("overlay").textContent = "กำลังตรวจ…";
   $("sMask").textContent = `${(pm * 100).toFixed(0)}%`;
-  $("sWho").textContent = match && match.dist < cfg.match_threshold ? match.person.name : "ไม่รู้จัก";
+  $("sWho").textContent = known ? match.person.name : "ไม่รู้จัก";
   $("sDist").textContent = match ? match.dist.toFixed(2) : "–";
   if (recent.length < 4) return;
 
@@ -136,7 +139,8 @@ function logOnce(p, result, pm, dist) {
   const key = p.id + result, now = Date.now();
   if (now - (lastCheckin.get(key) || 0) < COOLDOWN_MS) return;
   lastCheckin.set(key, now);
-  log.add({ time: new Date().toISOString(), id: p.id, name: p.name, result, mask: +pm.toFixed(3), dist: +dist.toFixed(3) });
+  log.add({ id: p.id, result, mask: +pm.toFixed(3), dist: +dist.toFixed(3) })
+    .catch((e) => ($("modelInfo").textContent = "บันทึกประวัติไม่สำเร็จ: " + e.message));
   if (navigator.vibrate) navigator.vibrate(result === "checked_in" ? 80 : [200, 100, 200]);
 }
 
@@ -177,8 +181,10 @@ $("btnShot1").onclick = async () => {
   $("regStatus").textContent = "กำลังถ่าย… มองตรงเข้ากล้อง ไม่สวมหน้ากาก";
   const r = await capture("plain");
   if (r.error) { $("regStatus").textContent = r.error; return; }
-  const dup = identify(r.list[0], distance);
-  if (dup && dup.dist < cfg.match_threshold && dup.person.id !== $("rId").value.trim()) {
+  let dup = null;
+  try { dup = await identify(r.list[0], cfg.match_threshold); }
+  catch (e) { $("regStatus").textContent = "เชื่อมต่อฐานข้อมูลไม่ได้: " + e.message; return; }
+  if (dup && dup.person && dup.person.id !== $("rId").value.trim()) {
     $("regStatus").textContent = `ใบหน้านี้ลงทะเบียนไว้แล้วเป็น ${dup.person.name} (${dup.person.id})`; return;
   }
   reg.plain = r.list; mark(1); $("btnShot2").disabled = false;
@@ -191,14 +197,16 @@ $("btnShot2").onclick = async () => {
   reg.masked = r.list; mark(2); $("btnSave").disabled = false;
   $("regStatus").textContent = "ครบทั้ง 2 ขั้น — กดบันทึก";
 };
-$("btnSave").onclick = () => {
+$("btnSave").onclick = async () => {
   if (!validForm() || !reg.plain.length || !reg.masked.length) return;
   const p = {
     id: $("rId").value.trim(), name: $("rName").value.trim(), dept: $("rDept").value.trim(),
     consent_at: new Date().toISOString(),
     templates: [...reg.plain.map((d) => ({ kind: "plain", d })), ...reg.masked.map((d) => ({ kind: "masked", d }))],
   };
-  if (!people.add(p)) { $("regStatus").textContent = "บันทึกไม่สำเร็จ (พื้นที่เก็บข้อมูลเต็มหรือถูกปิด)"; return; }
+  $("btnSave").disabled = true; $("regStatus").textContent = "กำลังบันทึก…";
+  try { await people.add(p); }
+  catch (e) { $("regStatus").textContent = "บันทึกไม่สำเร็จ: " + e.message; $("btnSave").disabled = false; return; }
   resetReg(true);
   // ลงทะเบียนเสร็จ -> ไปหน้าสแกนทันที พร้อมข้อความยืนยัน
   show("scan");
@@ -222,44 +230,50 @@ function resetReg(clearForm) {
 
 // ---------- ประวัติ / พนักงาน ----------
 const RESULT_TH = { checked_in: "เข้างาน ✓", denied_no_mask: "ไม่สวมหน้ากาก ✗" };
-function renderLog() {
-  const tb = $("logTable").querySelector("tbody"); tb.innerHTML = "";
-  for (const r of log.all().slice().reverse().slice(0, 200)) {
-    const tr = document.createElement("tr");
-    [new Date(r.time).toLocaleString("th-TH"), r.id, r.name, RESULT_TH[r.result] || r.result]
-      .forEach((t) => tr.append(Object.assign(document.createElement("td"), { textContent: t })));
-    tb.append(tr);
-  }
+const fmt = (t) => (t ? new Date(t).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" }) : "–");
+const cell = (tr, t) => tr.append(Object.assign(document.createElement("td"), { textContent: t }));
+async function renderLog() {
+  const tb = $("logTable").querySelector("tbody"); tb.innerHTML = "<tr><td colspan=4>กำลังโหลด…</td></tr>";
+  try {
+    const rows = await log.all(200); tb.innerHTML = "";
+    for (const r of rows) { const tr = document.createElement("tr"); [fmt(r.created_at), r.id, r.name, RESULT_TH[r.result] || r.result].forEach((t) => cell(tr, t)); tb.append(tr); }
+  } catch (e) { tb.innerHTML = ""; cell(tb.insertRow(), "โหลดไม่สำเร็จ: " + e.message); }
 }
-function renderPeople() {
-  const tb = $("peopleTable").querySelector("tbody"); tb.innerHTML = "";
-  for (const p of people.all()) {
+async function renderPeople() {
+  const tb = $("peopleTable").querySelector("tbody"); tb.innerHTML = "<tr><td colspan=6>กำลังโหลด…</td></tr>";
+  let list = [];
+  try { list = await people.all(); } catch (e) { tb.innerHTML = ""; cell(tb.insertRow(), "โหลดไม่สำเร็จ: " + e.message); return; }
+  $("peopleCount").textContent = `รายชื่อผู้ลงทะเบียนทั้งหมด ${list.length} คน`;
+  $("peopleEmpty").hidden = list.length > 0;
+  tb.innerHTML = "";
+  for (const p of list) {
     const tr = document.createElement("tr");
-    [p.id, p.name, p.dept].forEach((t) => tr.append(Object.assign(document.createElement("td"), { textContent: t })));
+    [p.id, p.name, p.dept || "–", fmt(p.registered_at), fmt(p.last_checkin)].forEach((t) => cell(tr, t));
     const del = Object.assign(document.createElement("button"), { textContent: "ลบ", className: "danger" });
-    del.onclick = () => { if (del.dataset.armed) { people.remove(p.id); renderPeople(); } else { del.dataset.armed = 1; del.textContent = "ยืนยันลบ"; } };
+    del.onclick = async () => {
+      const pin = $("adminPin").value.trim();
+      if (!pin) { $("peopleStatus").textContent = "ใส่ PIN ผู้ดูแลก่อนลบ"; return; }
+      if (!del.dataset.armed) { del.dataset.armed = 1; del.textContent = "ยืนยันลบ"; return; }
+      try { await people.remove(p.id, pin); $("peopleStatus").textContent = `ลบ ${p.name} แล้ว`; renderPeople(); }
+      catch (e) { $("peopleStatus").textContent = e.message; }
+    };
     const td = document.createElement("td"); td.append(del); tr.append(td); tb.append(tr);
   }
 }
+$("btnGoScan").onclick = () => show("scan");
+$("btnGoReg").onclick = () => show("register");
+$("btnPeopleRefresh").onclick = () => renderPeople();
 const download = (name, text, type) => {
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob(["﻿" + text], { type })); a.download = name; a.click();
+  a.href = URL.createObjectURL(new Blob(["\ufeff" + text], { type })); a.download = name; a.click();
 };
-$("btnCsv").onclick = () => download(`checkin_${new Date().toISOString().slice(0, 10)}.csv`, log.toCSV(), "text/csv");
-$("btnLogClear").onclick = (e) => {
-  const b = e.currentTarget;
-  if (b.dataset.armed) { log.clear(); renderLog(); delete b.dataset.armed; b.textContent = "ล้างประวัติ"; }
-  else { b.dataset.armed = 1; b.textContent = "กดอีกครั้งเพื่อยืนยัน"; }
+$("btnCsv").onclick = async () => download(`checkin_${new Date().toISOString().slice(0, 10)}.csv`, await log.toCSV(), "text/csv");
+$("btnLogClear").onclick = async () => {
+  const pin = $("logPin").value.trim();
+  if (!pin) { $("logStatus").textContent = "ใส่ PIN ผู้ดูแลก่อนล้างประวัติ"; return; }
+  try { await log.clear(pin); $("logStatus").textContent = "ล้างประวัติแล้ว"; renderLog(); }
+  catch (e) { $("logStatus").textContent = e.message; }
 };
-$("btnExport").onclick = () => download("employees_backup.json", JSON.stringify(people.all()), "application/json");
-$("fileImport").onchange = async (e) => {
-  try {
-    const list = JSON.parse(await e.target.files[0].text());
-    list.forEach((p) => p.id && Array.isArray(p.templates) && people.add(p));
-    renderPeople();
-  } catch { alertStatus("ไฟล์ไม่ถูกต้อง"); }
-};
-function alertStatus(t) { $("modelInfo").textContent = t; }
 
 // ---------- เก็บข้อมูลเทรนเพิ่ม ----------
 const KEY_COLLECT = "mc-collect-v1";

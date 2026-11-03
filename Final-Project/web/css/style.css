@@ -50,3 +50,5 @@ td, th { padding: 4px 6px; border-bottom: 1px solid #334155; text-align: left; }
 .steps { padding-left: 20px; } .steps span { color: var(--muted); font-size: .9rem; } .steps .done span { color: var(--good); }
 label { font-size: .9rem; color: var(--muted); }
 label input { display: block; margin-top: 4px; width: 100%; }
+
+.panel { overflow-x: auto; }

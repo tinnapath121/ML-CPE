@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0f172a" />
   <title>Mask Check-in</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="css/style.css?v=4" />
+  <link rel="stylesheet" href="css/style.css?v=6" />
 </head>
 <body>
   <header>
@@ -16,7 +16,7 @@
     <button role="tab" data-view="scan" class="active">สแกนเข้างาน</button>
     <button role="tab" data-view="register">ลงทะเบียน</button>
     <button role="tab" data-view="log">ประวัติ</button>
-    <button role="tab" data-view="people">ผู้ลงทะเบียน</button>
+    <button role="tab" data-view="people">รายชื่อผู้ลงทะเบียน</button>
     <button role="tab" data-view="collect">เก็บข้อมูล</button>
   </nav>
 
@@ -56,8 +56,7 @@
           <label>แผนก <input id="rDept" size="10" autocomplete="off" /></label>
         </div>
         <label class="consent"><input type="checkbox" id="rConsent" />
-          ข้าพเจ้ายินยอมให้ระบบเก็บ "ลายใบหน้า" (ตัวเลขที่คำนวณจากใบหน้า ไม่ใช่รูปถ่าย) ไว้ในอุปกรณ์นี้
-          เพื่อใช้ยืนยันตัวตนตอนเข้างานเท่านั้น และขอลบได้ทุกเมื่อ (พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล ม.26)
+          ข้าพเจ้ายินยอมให้ระบบเก็บ "ลายใบหน้า" (ตัวเลขที่คำนวณจากใบหน้า ไม่ใช่รูปถ่าย) ไว้ในฐานข้อมูลของระบบ (Supabase, ภูมิภาคสิงคโปร์) เพื่อใช้ยืนยันตัวตนตอนเข้างานเท่านั้น และขอให้ผู้ดูแลลบได้ทุกเมื่อ (พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล ม.26)
         </label>
         <ol class="steps">
           <li id="step1">ขั้นที่ 1 — ถ่ายหน้าตรง <b>ไม่สวมหน้ากาก</b> <span id="st1">ยังไม่ได้ถ่าย</span></li>
@@ -78,8 +77,10 @@
       <div class="panel">
         <div class="row">
           <button id="btnCsv" class="primary">ดาวน์โหลด CSV</button>
+          <label>PIN ผู้ดูแล <input id="logPin" type="password" inputmode="numeric" size="8" autocomplete="off" /></label>
           <button id="btnLogClear" class="danger">ล้างประวัติ</button>
         </div>
+        <p class="status" id="logStatus"></p>
         <table id="logTable"><thead><tr><th>เวลา</th><th>รหัส</th><th>ชื่อ</th><th>ผล</th></tr></thead><tbody></tbody></table>
       </div>
     </section>
@@ -87,10 +88,19 @@
     <!-- พนักงาน -->
     <section data-view="people" class="view" hidden>
       <div class="panel">
-        <table id="peopleTable"><thead><tr><th>รหัส</th><th>ชื่อ</th><th>แผนก</th><th></th></tr></thead><tbody></tbody></table>
+        <div class="row" style="justify-content:space-between">
+          <h2 id="peopleCount" style="margin:0;font-size:1.1rem">รายชื่อผู้ลงทะเบียน</h2>
+          <div class="row">
+            <button id="btnGoScan" class="primary">เริ่มสแกนเข้างาน</button>
+            <button id="btnGoReg">+ ลงทะเบียนใหม่</button>
+          </div>
+        </div>
+        <table id="peopleTable" style="margin-top:8px"><thead><tr><th>รหัส</th><th>ชื่อ</th><th>แผนก</th><th>ลงทะเบียนเมื่อ</th><th>เข้างานล่าสุด</th><th></th></tr></thead><tbody></tbody></table>
+        <p class="status" id="peopleStatus"></p>
+        <p class="status" id="peopleEmpty" hidden>ยังไม่มีผู้ลงทะเบียน — กด "+ ลงทะเบียนใหม่"</p>
         <div class="row" style="margin-top:8px">
-          <button id="btnExport">สำรองข้อมูล (JSON)</button>
-          <label>นำเข้า <input type="file" id="fileImport" accept="application/json" /></label>
+          <button id="btnPeopleRefresh">รีเฟรช</button>
+          <label>PIN ผู้ดูแล (สำหรับลบ) <input id="adminPin" type="password" inputmode="numeric" size="8" autocomplete="off" /></label>
         </div>
       </div>
     </section>
@@ -121,8 +131,8 @@
     </section>
 
     <p class="status" id="modelInfo"></p>
-    <p class="status">ประมวลผลบนอุปกรณ์นี้ทั้งหมด ไม่มีการส่งภาพหรือข้อมูลใบหน้าออกไปที่ใด</p>
+    <p class="status">ภาพจากกล้องประมวลผลบนอุปกรณ์นี้เท่านั้น ไม่มีการส่งรูปออกไป · ส่งเฉพาะลายใบหน้า (ตัวเลข 128 ค่า) ไปเทียบกับฐานข้อมูล</p>
   </main>
-  <script type="module" src="js/app.js?v=4"></script>
+  <script type="module" src="js/app.js?v=6"></script>
 </body>
 </html>

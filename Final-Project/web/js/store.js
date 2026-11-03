@@ -1,42 +1,51 @@
-// store.js — เก็บข้อมูลผู้ลงทะเบียนและประวัติเข้างาน "ในเครื่องนี้เท่านั้น" (localStorage)
-// เก็บเฉพาะลายใบหน้า (ตัวเลข 128 ค่า) ไม่เก็บรูปถ่าย เพื่อลดข้อมูลส่วนบุคคลให้น้อยที่สุด (PDPA data minimization)
-// ระบบจริงในโรงงานควรย้ายไปเก็บบนเซิร์ฟเวอร์ของหน่วยงานที่เข้ารหัสและควบคุมสิทธิ์
+// store.js — ฐานข้อมูลกลางบน Supabase (ทุกเครื่องเห็นรายชื่อและประวัติเดียวกัน)
+// เรียกผ่านฟังก์ชัน RPC เท่านั้น: ตารางจริงอยู่ใน schema ที่ไม่เปิดผ่าน API
+// -> เบราว์เซอร์ส่งลายใบหน้า 128 ค่าไปให้ "ฐานข้อมูลเทียบเอง" และได้กลับมาแค่ ชื่อ/รหัส/ระยะห่าง
+//    ไม่มีใครดึงลายใบหน้าของคนอื่นออกมาได้ (ดู supabase/schema.sql)
+// คีย์ด้านล่างเป็น publishable key ที่ออกแบบให้ใส่ในหน้าเว็บได้ สิทธิ์ถูกจำกัดด้วยฟังก์ชันฝั่งฐานข้อมูล
 
-const KEY_PEOPLE = "mc-people-v1";
-const KEY_LOG = "mc-log-v1";
+const URL = "https://vwhuxqxugjrvwqaroiap.supabase.co";
+const KEY = "sb_publishable_5i3UpYDL-ykRMzZOWWEx5Q_fHcSkXAS";
 
-function read(key) { try { return JSON.parse(localStorage.getItem(key)) || []; } catch { return []; } }
-function write(key, v) {
-  try { localStorage.setItem(key, JSON.stringify(v)); return true; } catch { return false; }
+async function rpc(fn, args = {}) {
+  const res = await fetch(`${URL}/rest/v1/rpc/${fn}`, {
+    method: "POST",
+    headers: { apikey: KEY, Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify(args),
+  });
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : null;
+  if (!res.ok) throw new Error(data?.message || `เชื่อมต่อฐานข้อมูลไม่สำเร็จ (${res.status})`);
+  return data;
 }
 
+const round = (d) => d.map((v) => +v.toFixed(6));
+
 export const people = {
-  all: () => read(KEY_PEOPLE),
-  add(p) { const list = read(KEY_PEOPLE).filter((x) => x.id !== p.id); list.push(p); return write(KEY_PEOPLE, list); },
-  remove(id) { write(KEY_PEOPLE, read(KEY_PEOPLE).filter((x) => x.id !== id)); },
-  clear() { write(KEY_PEOPLE, []); },
+  all: () => rpc("list_employees"),
+  add: (p) => rpc("register_employee", {
+    p_id: p.id, p_name: p.name, p_dept: p.dept, p_consent: true,
+    p_templates: p.templates.map((t) => ({ kind: t.kind, d: round(t.d) })),
+  }),
+  remove: (id, pin) => rpc("delete_employee", { p_id: id, p_pin: pin }),
 };
 
 export const log = {
-  all: () => read(KEY_LOG),
-  add(entry) { const l = read(KEY_LOG); l.push(entry); write(KEY_LOG, l.slice(-2000)); },
-  clear() { write(KEY_LOG, []); },
-  toCSV() {
-    const rows = read(KEY_LOG);
+  all: (limit = 200) => rpc("list_checkins", { p_limit: limit }),
+  add: (e) => rpc("log_checkin", { p_id: e.id, p_result: e.result, p_mask: e.mask, p_distance: e.dist }),
+  clear: (pin) => rpc("clear_checkins", { p_pin: pin }),
+  async toCSV() {
+    const rows = await log.all(1000);
     const esc = (s) => `"${String(s ?? "").replace(/"/g, '""')}"`;
     return ["time,employee_id,name,result,mask_prob,distance",
-      ...rows.map((r) => [r.time, r.id, r.name, r.result, r.mask, r.dist].map(esc).join(","))].join("\n");
+      ...rows.map((r) => [r.created_at, r.id, r.name, r.result, r.mask_prob, r.distance].map(esc).join(","))].join("\n");
   },
 };
 
-/** หาคนที่ลายใบหน้าใกล้ที่สุด (1-Nearest Neighbor ข้ามทุก template ของทุกคน) */
-export function identify(descriptor, distanceFn) {
-  let best = null;
-  for (const p of read(KEY_PEOPLE)) {
-    for (const t of p.templates) {
-      const d = distanceFn(descriptor, t.d);
-      if (!best || d < best.dist) best = { person: p, dist: d, kind: t.kind };
-    }
-  }
-  return best;
+/** 1-NN ในฐานข้อมูล: คืน { person: {id,name,dept} | null (ไม่รู้จัก), dist } หรือ null ถ้ายังไม่มีใครลงทะเบียน */
+export async function identify(descriptor, threshold) {
+  const rows = await rpc("identify", { p_desc: round(descriptor), p_threshold: threshold });
+  if (!rows || !rows.length) return null;
+  const r = rows[0];
+  return { person: r.id ? { id: r.id, name: r.name, dept: r.dept } : null, dist: r.distance, kind: r.kind };
 }
