@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+# รูปและไฟล์ไลบรารีที่ใช้ตอนดึง feature (ดาวน์โหลดใหม่ได้ตาม README)
+ml/extract/ds1/
+ml/extract/ds2/
+ml/extract/real/
+ml/extract/model/
+ml/extract/*.wasm
+ml/extract/face-api.esm.js

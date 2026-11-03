@@ -1,0 +1,24 @@
+<!doctype html><meta charset="utf-8"><body><script type="module">
+import * as faceapi from './face-api.esm.js';
+window.ready = (async () => {
+  if ((window.BACKEND||'')==='wasm') faceapi.tf.setWasmPaths('/'); await faceapi.tf.setBackend(window.BACKEND || 'webgl'); await faceapi.tf.ready();
+  await faceapi.nets.ssdMobilenetv1.loadFromUri('model'); await faceapi.nets.tinyFaceDetector.loadFromUri('model');
+  await faceapi.nets.faceLandmark68Net.loadFromUri('model');
+  await faceapi.nets.faceRecognitionNet.loadFromUri('model');
+  return faceapi.tf.getBackend();
+})();
+window.faceapi = faceapi;
+const load = (src) => new Promise((ok, err) => { const i = new Image(); i.onload = () => ok(i); i.onerror = err; i.src = src; });
+// same logic as the app: detect -> landmarks -> descriptor; if no face found, use whole image
+// MUST match web/js/face.js: pad 20% grey border, SSD MobileNet minConfidence 0.15
+window.extract = async (src) => {
+  const img = await load(src);
+  const p = Math.round(Math.max(img.width, img.height) * 0.2);
+  const c = document.createElement("canvas"); c.width = img.width + 2 * p; c.height = img.height + 2 * p;
+  const x = c.getContext("2d"); x.fillStyle = "#808080"; x.fillRect(0, 0, c.width, c.height); x.drawImage(img, p, p);
+  const det = await faceapi.detectSingleFace(c, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.15 })).withFaceLandmarks().withFaceDescriptor();
+  if (det) return { found: 1, score: det.detection.score, d: Array.from(det.descriptor) };
+  const d = await faceapi.computeFaceDescriptor(img);
+  return { found: 0, score: 0, d: Array.from(d) };
+};
+</script>

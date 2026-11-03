@@ -1,0 +1,249 @@
+// app.js — ควบคุมหน้าจอทั้งหมด
+// สแกน: กล้อง -> ตรวจจับใบหน้า -> ลายใบหน้า 128 ค่า -> (1) โมเดลตรวจแมสของเรา (2) 1-NN เทียบผู้ลงทะเบียน
+// ผ่านเมื่อ: จำหน้าได้ (ระยะ < เกณฑ์) และ สวมหน้ากาก
+import { loadFaceApi, analyzeFace, distance, startCamera } from "./face.js";
+import { loadModel } from "./model.js";
+import { people, log, identify } from "./store.js";
+
+const $ = (id) => document.getElementById(id);
+const video = $("video"), canvas = $("canvas"), ctx = canvas.getContext("2d");
+
+let maskModel = null, cfg = { match_threshold: 0.5, mask_threshold: 0.5 };
+let view = "scan", busy = false, lastFace = null;
+const recent = [];                 // ผลสแกนล่าสุดหลายเฟรม ใช้โหวตให้ผลนิ่ง
+const COOLDOWN_MS = 30000;          // คนเดิมลงเวลาซ้ำไม่ได้ภายใน 30 วินาที
+const lastCheckin = new Map();
+const SCAN_EVERY_MS = 250;
+
+// ---------- เริ่มต้น ----------
+(async () => {
+  try {
+    const [backend, m, c] = await Promise.all([
+      loadFaceApi((s) => ($("overlay").textContent = s)),
+      loadModel("model/mask_model.json"),
+      fetch("model/config.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    ]);
+    maskModel = m; if (c) cfg = { ...cfg, ...c };
+    $("overlay").textContent = "พร้อม — กดเปิดกล้อง";
+    $("modelInfo").textContent = `โมเดลตรวจแมส: MLP · เทรนเมื่อ ${m.trained_at} · เกณฑ์จำหน้า ${cfg.match_threshold} · backend ${backend}`;
+  } catch (e) {
+    $("overlay").textContent = "โหลดไม่สำเร็จ: " + e.message;
+  }
+})();
+
+$("btnCamFront").onclick = () => openCam("user");
+$("btnCamBack").onclick = () => openCam("environment");
+async function openCam(mode) {
+  try {
+    await startCamera(video, mode);
+    video.classList.toggle("mirror", mode === "user");
+    canvas.classList.toggle("mirror", mode === "user");
+    loop();
+  } catch (e) { $("overlay").textContent = "เปิดกล้องไม่ได้: " + e.message; }
+}
+
+// ---------- แท็บ ----------
+document.querySelectorAll(".tabs button").forEach((b) => (b.onclick = () => show(b.dataset.view)));
+function show(v) {
+  view = v;
+  document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("active", b.dataset.view === v));
+  document.querySelectorAll("section.view").forEach((s) => (s.hidden = s.dataset.view !== v));
+  $("cameraBox").hidden = !(v === "scan" || v === "register");
+  if (v === "log") renderLog();
+  if (v === "people") renderPeople();
+}
+
+// ---------- วนประมวลผล ----------
+let timer = 0;
+function loop() {
+  clearTimeout(timer);
+  const tick = async () => {
+    if (!busy && maskModel && video.readyState >= 2 && !$("cameraBox").hidden) {
+      busy = true;
+      try {
+        const f = await analyzeFace(video);
+        lastFace = f;
+        draw(f);
+        if (view === "scan") onScanFrame(f);
+        else $("overlay").textContent = f ? `เจอใบหน้า · แมส ${(maskProb(f) * 100).toFixed(0)}%` : "ไม่พบใบหน้า";
+      } finally { busy = false; }
+    }
+    timer = setTimeout(tick, SCAN_EVERY_MS);
+  };
+  tick();
+}
+
+function maskProb(f) { return maskModel.predict(f.descriptor).probs.with_mask ?? 0; }
+
+function draw(f) {
+  canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (!f) return;
+  const ok = maskProb(f) >= cfg.mask_threshold;
+  ctx.lineWidth = 4; ctx.strokeStyle = ok ? "#22c55e" : "#ef4444";
+  ctx.strokeRect(f.box.x, f.box.y, f.box.width, f.box.height);
+}
+
+// ---------- ตรรกะสแกนเข้างาน ----------
+function onScanFrame(f) {
+  if (!f) { recent.length = 0; $("overlay").textContent = "ไม่พบใบหน้า — ขยับเข้ามาใกล้กล้อง"; return; }
+  const pm = maskProb(f);
+  const match = identify(f.descriptor, distance);
+  recent.push({ pm, id: match && match.dist < cfg.match_threshold ? match.person.id : null, match });
+  if (recent.length > 4) recent.shift();
+  $("overlay").textContent = "กำลังตรวจ…";
+  $("sMask").textContent = `${(pm * 100).toFixed(0)}%`;
+  $("sWho").textContent = match && match.dist < cfg.match_threshold ? match.person.name : "ไม่รู้จัก";
+  $("sDist").textContent = match ? match.dist.toFixed(2) : "–";
+  if (recent.length < 4) return;
+
+  // โหวต 4 เฟรมล่าสุด: ต้องได้คนเดียวกันทุกเฟรม และใช้ค่าเฉลี่ยความน่าจะเป็นแมส
+  const ids = new Set(recent.map((r) => r.id));
+  const avgMask = recent.reduce((s, r) => s + r.pm, 0) / recent.length;
+  const masked = avgMask >= cfg.mask_threshold;
+  if (ids.size !== 1) return;
+  const id = [...ids][0];
+
+  if (!id) {
+    setResult("warn", "ไม่พบข้อมูลในระบบ", "ยังไม่ได้ลงทะเบียน กรุณาลงทะเบียนก่อนใช้งาน",
+      { label: "ไปลงทะเบียน", fn: () => show("register") });
+    return;
+  }
+  const p = recent.at(-1).match.person, dist = recent.at(-1).match.dist;
+  if (!masked) {
+    setResult("deny", `${p.name} — กรุณาสวมหน้ากาก`, "ต้องสวมหน้ากากอนามัยก่อนเข้าพื้นที่โรงงาน");
+    logOnce(p, "denied_no_mask", avgMask, dist);
+    return;
+  }
+  const t = new Date();
+  setResult("ok", `ลงเวลาเข้างานสำเร็จ ✓`, `${p.name} (${p.id}) · ${t.toLocaleTimeString("th-TH")}`);
+  logOnce(p, "checked_in", avgMask, dist);
+}
+
+function logOnce(p, result, pm, dist) {
+  const key = p.id + result, now = Date.now();
+  if (now - (lastCheckin.get(key) || 0) < COOLDOWN_MS) return;
+  lastCheckin.set(key, now);
+  log.add({ time: new Date().toISOString(), id: p.id, name: p.name, result, mask: +pm.toFixed(3), dist: +dist.toFixed(3) });
+  if (navigator.vibrate) navigator.vibrate(result === "checked_in" ? 80 : [200, 100, 200]);
+}
+
+function setResult(kind, title, sub, action) {
+  const el = $("result");
+  el.className = "result " + kind;
+  el.innerHTML = "";
+  el.append(Object.assign(document.createElement("div"), { className: "result-title", textContent: title }));
+  el.append(Object.assign(document.createElement("div"), { className: "result-sub", textContent: sub }));
+  if (action) {
+    const b = Object.assign(document.createElement("button"), { className: "primary", textContent: action.label });
+    b.style.marginTop = "8px"; b.onclick = action.fn; el.append(b);
+  }
+}
+
+// ---------- ลงทะเบียน ----------
+const reg = { plain: [], masked: [] };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function capture(kind) {
+  // เก็บ 3 เฟรมห่างกันเล็กน้อย เพื่อให้ได้ลายใบหน้าหลายมุมเล็กน้อย จำได้แม่นขึ้น
+  const out = [];
+  for (let i = 0; i < 12 && out.length < 3; i++) {
+    await sleep(350);
+    const f = lastFace;
+    if (!f) continue;
+    const pm = maskProb(f);
+    if (kind === "plain" && pm >= cfg.mask_threshold) return { error: "ระบบเห็นว่ายังสวมหน้ากากอยู่ — ถอดหน้ากากแล้วถ่ายใหม่" };
+    if (kind === "masked" && pm < cfg.mask_threshold) return { error: "ระบบยังไม่เห็นหน้ากาก — สวมหน้ากากให้ปิดจมูกและปากแล้วถ่ายใหม่" };
+    if (!out.length || distance(out.at(-1), f.descriptor) > 0.02) out.push(f.descriptor);
+  }
+  if (!out.length) return { error: "ไม่พบใบหน้า — มองตรงเข้ากล้องให้เห็นทั้งหน้า แล้วลองใหม่" };
+  return { list: out };
+}
+
+$("btnShot1").onclick = async () => {
+  if (!validForm()) return;
+  $("regStatus").textContent = "กำลังถ่าย… มองตรงเข้ากล้อง ไม่สวมหน้ากาก";
+  const r = await capture("plain");
+  if (r.error) { $("regStatus").textContent = r.error; return; }
+  const dup = identify(r.list[0], distance);
+  if (dup && dup.dist < cfg.match_threshold && dup.person.id !== $("rId").value.trim()) {
+    $("regStatus").textContent = `ใบหน้านี้ลงทะเบียนไว้แล้วเป็น ${dup.person.name} (${dup.person.id})`; return;
+  }
+  reg.plain = r.list; mark(1); $("btnShot2").disabled = false;
+  $("regStatus").textContent = "ขั้นที่ 1 เรียบร้อย — สวมหน้ากากแล้วกดถ่ายขั้นที่ 2";
+};
+$("btnShot2").onclick = async () => {
+  $("regStatus").textContent = "กำลังถ่าย… สวมหน้ากากแล้วมองตรงเข้ากล้อง";
+  const r = await capture("masked");
+  if (r.error) { $("regStatus").textContent = r.error; return; }
+  reg.masked = r.list; mark(2); $("btnSave").disabled = false;
+  $("regStatus").textContent = "ครบทั้ง 2 ขั้น — กดบันทึก";
+};
+$("btnSave").onclick = () => {
+  if (!validForm() || !reg.plain.length || !reg.masked.length) return;
+  const p = {
+    id: $("rId").value.trim(), name: $("rName").value.trim(), dept: $("rDept").value.trim(),
+    consent_at: new Date().toISOString(),
+    templates: [...reg.plain.map((d) => ({ kind: "plain", d })), ...reg.masked.map((d) => ({ kind: "masked", d }))],
+  };
+  if (!people.add(p)) { $("regStatus").textContent = "บันทึกไม่สำเร็จ (พื้นที่เก็บข้อมูลเต็มหรือถูกปิด)"; return; }
+  $("regStatus").textContent = `ลงทะเบียน ${p.name} สำเร็จ — ไปที่แท็บ "สแกนเข้างาน" เพื่อทดสอบ`;
+  resetReg(false);
+};
+$("btnRegReset").onclick = () => resetReg(true);
+
+function validForm() {
+  if (!$("rId").value.trim() || !$("rName").value.trim()) { $("regStatus").textContent = "กรอกรหัสพนักงานและชื่อก่อน"; return false; }
+  if (!$("rConsent").checked) { $("regStatus").textContent = "ต้องกดยินยอมการเก็บลายใบหน้าก่อน"; return false; }
+  return true;
+}
+function mark(n) { $("step" + n).classList.add("done"); $("st" + n).textContent = "✓ เรียบร้อย"; }
+function resetReg(clearForm) {
+  reg.plain = []; reg.masked = [];
+  for (const n of [1, 2]) { $("step" + n).classList.remove("done"); $("st" + n).textContent = "ยังไม่ได้ถ่าย"; }
+  $("btnShot2").disabled = true; $("btnSave").disabled = true;
+  if (clearForm) { ["rId", "rName", "rDept"].forEach((i) => ($(i).value = "")); $("rConsent").checked = false; $("regStatus").textContent = ""; }
+}
+
+// ---------- ประวัติ / พนักงาน ----------
+const RESULT_TH = { checked_in: "เข้างาน ✓", denied_no_mask: "ไม่สวมหน้ากาก ✗" };
+function renderLog() {
+  const tb = $("logTable").querySelector("tbody"); tb.innerHTML = "";
+  for (const r of log.all().slice().reverse().slice(0, 200)) {
+    const tr = document.createElement("tr");
+    [new Date(r.time).toLocaleString("th-TH"), r.id, r.name, RESULT_TH[r.result] || r.result]
+      .forEach((t) => tr.append(Object.assign(document.createElement("td"), { textContent: t })));
+    tb.append(tr);
+  }
+}
+function renderPeople() {
+  const tb = $("peopleTable").querySelector("tbody"); tb.innerHTML = "";
+  for (const p of people.all()) {
+    const tr = document.createElement("tr");
+    [p.id, p.name, p.dept].forEach((t) => tr.append(Object.assign(document.createElement("td"), { textContent: t })));
+    const del = Object.assign(document.createElement("button"), { textContent: "ลบ", className: "danger" });
+    del.onclick = () => { if (del.dataset.armed) { people.remove(p.id); renderPeople(); } else { del.dataset.armed = 1; del.textContent = "ยืนยันลบ"; } };
+    const td = document.createElement("td"); td.append(del); tr.append(td); tb.append(tr);
+  }
+}
+const download = (name, text, type) => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["﻿" + text], { type })); a.download = name; a.click();
+};
+$("btnCsv").onclick = () => download(`checkin_${new Date().toISOString().slice(0, 10)}.csv`, log.toCSV(), "text/csv");
+$("btnLogClear").onclick = (e) => {
+  const b = e.currentTarget;
+  if (b.dataset.armed) { log.clear(); renderLog(); delete b.dataset.armed; b.textContent = "ล้างประวัติ"; }
+  else { b.dataset.armed = 1; b.textContent = "กดอีกครั้งเพื่อยืนยัน"; }
+};
+$("btnExport").onclick = () => download("employees_backup.json", JSON.stringify(people.all()), "application/json");
+$("fileImport").onchange = async (e) => {
+  try {
+    const list = JSON.parse(await e.target.files[0].text());
+    list.forEach((p) => p.id && Array.isArray(p.templates) && people.add(p));
+    renderPeople();
+  } catch { alertStatus("ไฟล์ไม่ถูกต้อง"); }
+};
+function alertStatus(t) { $("modelInfo").textContent = t; }
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
