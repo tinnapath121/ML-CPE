@@ -1,1 +1,1 @@
-{"match_threshold": 0.55, "mask_threshold": 0.5, "mask_pass": 0.75, "hand_max": 0.25, "vote_frames": 6}
+{"match_threshold": 0.55, "mask_threshold": 0.5, "mask_pass": 0.75, "hand_max": 0.25, "vote_frames": 6, "mouth_cheek_max": 25, "cheek_neck_min": 30, "cheek_forehead_max": 60, "skin_forehead_max": 40}

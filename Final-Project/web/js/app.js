@@ -1,9 +1,9 @@
 // app.js — ควบคุมหน้าจอทั้งหมด
 // สแกน: กล้อง -> ตรวจจับใบหน้า -> ลายใบหน้า 128 ค่า -> (1) โมเดลตรวจแมสของเรา (2) 1-NN เทียบผู้ลงทะเบียน
 // ผ่านเมื่อ: จำหน้าได้ (ระยะ < เกณฑ์) และ สวมหน้ากาก
-import { loadFaceApi, analyzeFace, distance, startCamera } from "./face.js?v=16";
-import { loadModel } from "./model.js?v=16";
-import { people, log, identify } from "./store.js?v=16";
+import { loadFaceApi, analyzeFace, distance, startCamera, looksLikeMask } from "./face.js?v=17";
+import { loadModel } from "./model.js?v=17";
+import { people, log, identify } from "./store.js?v=17";
 
 // ถ้าหา element ไม่เจอ (เช่น เบราว์เซอร์ยังจำ HTML เวอร์ชันเก่า) คืนตัวหลอกแทน null เพื่อไม่ให้ทั้งแอปพัง
 const dummy = new Proxy(function () {}, { get: (t, k) => (k === "classList" ? { toggle() {}, add() {}, remove() {} } : k === "querySelector" ? () => dummy : k === "dataset" ? {} : ""), set: () => true });
@@ -108,7 +108,7 @@ async function onScanFrame(f) {
   try { match = await identify(f.descriptor, cfg.match_threshold); }
   catch (e) { $("overlay").textContent = "เชื่อมต่อฐานข้อมูลไม่ได้: " + e.message; return; }
   const known = !!(match && match.person);
-  recent.push({ pm, hp: handProb(f), id: known ? match.person.id : null, match, box: f.box });
+  recent.push({ pm, hp: handProb(f), cov: looksLikeMask(f.cues, cfg), id: known ? match.person.id : null, match, box: f.box });
   // โหวต 6 เฟรม (~1.5 วินาที): คนใส่แว่น+แมสคล้ายกันง่าย จึงต้องได้คนเดียวกันติดกันนานขึ้น
   const VOTE = cfg.vote_frames ?? 6;
   if (recent.length > VOTE) recent.shift();
@@ -127,7 +127,8 @@ async function onScanFrame(f) {
   //  1) ค่าเฉลี่ย 4 เฟรม >= mask_pass (0.75)  2) ทุกเฟรม >= mask_threshold (0.5) ไม่มีเฟรมไหนหลุด
   //  3) ไม่มีเฟรมไหนที่โมเดลคิดว่าเป็น "มือปิดปาก" เกิน 0.25
   const PASS = cfg.mask_pass ?? 0.75, HAND_MAX = cfg.hand_max ?? 0.25;
-  const masked = avgMask >= PASS && recent.every((r) => r.pm >= cfg.mask_threshold) && recent.every((r) => r.hp < HAND_MAX);
+  const masked = avgMask >= PASS && recent.every((r) => r.pm >= cfg.mask_threshold) && recent.every((r) => r.hp < HAND_MAX)
+    && recent.every((r) => r.cov);   // 4) ด่านสี: ปากต้องถูกปิด และไม่ใช่เสื้อที่ดึงขึ้นมาปิด
   if (ids.size !== 1) return;
   const id = [...ids][0];
 
@@ -194,6 +195,7 @@ async function capture(kind) {
     const pm = maskProb(f);
     if (kind === "plain" && pm >= cfg.mask_threshold) return { error: "ระบบเห็นว่ายังสวมหน้ากากอยู่ — ถอดหน้ากากแล้วถ่ายใหม่" };
     if (kind === "masked" && pm < cfg.mask_threshold) return { error: "ระบบยังไม่เห็นหน้ากาก — สวมหน้ากากให้ปิดจมูกและปากแล้วถ่ายใหม่" };
+    if (kind === "masked" && !looksLikeMask(f.cues, cfg)) return { error: "ต้องเป็นหน้ากากอนามัยที่ปิดจมูกและปาก (ไม่ใช่เสื้อ ผ้า หรือแผ่นมาสก์หน้า)" };
     if (!out.length || distance(out.at(-1), f.descriptor) > 0.02) out.push(f.descriptor);
   }
   if (!out.length) return { error: "ไม่พบใบหน้า — มองตรงเข้ากล้องให้เห็นทั้งหน้า แล้วลองใหม่" };
