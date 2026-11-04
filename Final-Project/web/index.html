@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="css/style.css?v=9" />
+  <link rel="stylesheet" href="css/style.css?v=10" />
 </head>
 <body>
   <header class="appbar">
@@ -84,8 +84,8 @@
 
         <label class="consent" for="rConsent">
           <input type="checkbox" id="rConsent" />
-          <span>ข้าพเจ้ายินยอมให้ระบบเก็บ <b>"ลายใบหน้า"</b> (ตัวเลขที่คำนวณจากใบหน้า ไม่ใช่รูปถ่าย)
-            ไว้ในฐานข้อมูลของระบบ (Supabase ภูมิภาคสิงคโปร์) เพื่อใช้ยืนยันตัวตนตอนเข้างานเท่านั้น
+          <span>ข้าพเจ้ายินยอมให้ระบบเก็บ <b>"ลายใบหน้า"</b> (ตัวเลขที่คำนวณจากใบหน้า) และ <b>รูปหน้าขนาดย่อทุกครั้งที่สแกนเข้างาน</b>
+            ไว้ในฐานข้อมูลของระบบ (Supabase ภูมิภาคสิงคโปร์) เพื่อใช้ยืนยันตัวตนและเป็นหลักฐานการเข้างานเท่านั้น
             และขอให้ผู้ดูแลลบได้ทุกเมื่อ <small>(พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล ม.26)</small></span>
         </label>
 
@@ -108,7 +108,7 @@
       <div class="card">
         <div class="card-head">
           <h2>ประวัติเข้างาน</h2>
-          <button id="btnCsv" class="primary">ดาวน์โหลด CSV</button>
+          <button id="btnCsv" class="primary">ดาวน์โหลดรายงาน</button>
         </div>
         <table id="logTable" class="list"><thead><tr><th>เวลา</th><th>รหัส</th><th>ชื่อ</th><th>ผล</th></tr></thead><tbody></tbody></table>
         <details class="admin">
@@ -177,6 +177,6 @@
       <p>ภาพจากกล้องประมวลผลบนอุปกรณ์นี้เท่านั้น ไม่มีการส่งรูปออกไป · ส่งเฉพาะลายใบหน้า (ตัวเลข 128 ค่า) ไปเทียบกับฐานข้อมูล</p>
     </footer>
   </main>
-  <script type="module" src="js/app.js?v=9"></script>
+  <script type="module" src="js/app.js?v=10"></script>
 </body>
 </html>

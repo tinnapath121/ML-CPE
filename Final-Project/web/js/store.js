@@ -32,32 +32,45 @@ export const people = {
 
 export const log = {
   all: (limit = 200) => rpc("list_checkins", { p_limit: limit }),
-  add: (e) => rpc("log_checkin", { p_id: e.id, p_result: e.result, p_mask: e.mask, p_distance: e.dist }),
+  add: (e) => rpc("log_checkin", { p_id: e.id, p_result: e.result, p_mask: e.mask, p_distance: e.dist, p_photo: e.photo || null }),
   clear: (pin) => rpc("clear_checkins", { p_pin: pin }),
-  // ส่งออกประวัติเป็น CSV ที่เปิดใน Excel / Google Sheets แล้วอ่านง่าย
-  // - หัวคอลัมน์ภาษาไทย, แยกวันที่กับเวลา (เวลาไทย), เรียงจากเก่าไปใหม่, มีคอลัมน์ลำดับ
-  // - ผลลัพธ์เป็นคำไทย, ค่าความมั่นใจเป็น %, ระยะห่าง 2 ตำแหน่ง
-  // - ใส่แผนก โดยจับคู่กับรายชื่อผู้ลงทะเบียน
-  async toCSV() {
+  // รายงานประวัติเข้างาน: ไฟล์ HTML เปิดได้ทุกเครื่อง มีรูปหน้าย่อ และกด "พิมพ์ / บันทึกเป็น PDF" ได้
+  async toReport() {
     const [rows, staff] = await Promise.all([log.all(1000), people.all().catch(() => [])]);
     const dept = Object.fromEntries((staff || []).map((p) => [p.id, p.dept || ""]));
     const RESULT = { checked_in: "เข้างาน", denied_no_mask: "ไม่ให้เข้า (ไม่สวมหน้ากาก)" };
     const tz = { timeZone: "Asia/Bangkok" };
-    const date = (t) => new Date(t).toLocaleDateString("en-CA", tz);                     // 2026-11-05 (Excel เรียงได้)
-    const time = (t) => new Date(t).toLocaleTimeString("en-GB", { ...tz, hour12: false }); // 08:15:30
-    // กัน CSV/Formula injection (OWASP): ค่าที่ขึ้นต้นด้วย = + - @ จะถูก Excel มองเป็นสูตร
-    const safe = (v) => { const s = String(v ?? ""); return /^[=+\-@\t\r]/.test(s) ? "'" + s : s; };
-    const esc = (v) => `"${safe(v).replace(/"/g, '""')}"`;
-    // รหัสที่เป็นตัวเลขล้วน เช่น 00123 ให้ Excel แสดงเป็นข้อความ ไม่ตัดเลข 0 หน้า
-    const idCell = (id) => (/^\d+$/.test(id) ? `="${id}"` : esc(id));
-    const head = ["ลำดับ", "วันที่", "เวลา", "รหัสพนักงาน", "ชื่อ-นามสกุล", "แผนก", "ผลการตรวจ", "ความมั่นใจว่าสวมหน้ากาก (%)", "ระยะห่างใบหน้า"];
-    const body = [...rows].reverse().map((r, i) => [
-      esc(i + 1), esc(date(r.created_at)), esc(time(r.created_at)), idCell(r.id), esc(r.name), esc(dept[r.id] ?? ""),
-      esc(RESULT[r.result] || r.result),
-      esc(r.mask_prob == null ? "" : (r.mask_prob * 100).toFixed(1)),
-      esc(r.distance == null ? "" : Number(r.distance).toFixed(2)),
-    ].join(","));
-    return [head.map(esc).join(","), ...body].join("\r\n"); // CRLF ตามมาตรฐาน CSV (RFC 4180)
+    const date = (t) => new Date(t).toLocaleDateString("th-TH", { ...tz, dateStyle: "medium" });
+    const time = (t) => new Date(t).toLocaleTimeString("th-TH", { ...tz, hour12: false });
+    // escape ทุกค่าที่มาจากผู้ใช้ กัน XSS ในไฟล์รายงาน
+    const h = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const img = (p) => (p && p.startsWith("data:image/jpeg;base64,") ? `<img src="${p}" alt="">` : `<span class="nop">ไม่มีรูป</span>`);
+    const list = [...rows].reverse();
+    const ok = list.filter((r) => r.result === "checked_in").length;
+    const body = list.map((r, i) => `<tr class="${r.result === "checked_in" ? "" : "deny"}">
+<td>${i + 1}</td><td>${img(r.photo)}</td><td>${h(date(r.created_at))}<br><b>${h(time(r.created_at))}</b></td>
+<td>${h(r.id)}</td><td>${h(r.name)}</td><td>${h(dept[r.id] || "–")}</td>
+<td class="res">${h(RESULT[r.result] || r.result)}</td>
+<td>${r.mask_prob == null ? "–" : (r.mask_prob * 100).toFixed(1) + "%"}</td></tr>`).join("\n");
+    const now = new Date().toLocaleString("th-TH", { ...tz, dateStyle: "long", timeStyle: "short" });
+    return `<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>รายงานประวัติเข้างาน</title><style>
+body{font-family:Sarabun,Tahoma,sans-serif;margin:24px;color:#111;background:#fff}
+h1{font-size:22px;margin:0 0 4px}.meta{color:#555;margin-bottom:16px}
+.sum{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap}.sum div{border:1px solid #ddd;border-radius:8px;padding:8px 14px}
+.sum b{display:block;font-size:20px}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{border:1px solid #ddd;padding:6px 8px;text-align:left;vertical-align:middle}
+th{background:#f1f5f9}img{width:56px;height:56px;object-fit:cover;border-radius:6px;display:block}
+.deny .res{color:#b91c1c;font-weight:700}.res{color:#15803d;font-weight:700}.nop{color:#999;font-size:12px}
+button{margin-bottom:16px;padding:8px 16px;font:inherit;cursor:pointer}
+@media print{button{display:none}body{margin:0}tr{break-inside:avoid}}
+</style></head><body>
+<h1>รายงานประวัติเข้างาน — Mask Check-in</h1>
+<div class="meta">ออกรายงานเมื่อ ${h(now)} · ข้อมูลส่วนบุคคลตาม พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล ใช้ภายในหน่วยงานเท่านั้น</div>
+<div class="sum"><div>ทั้งหมด<b>${list.length}</b></div><div>เข้างาน<b>${ok}</b></div><div>ไม่ให้เข้า<b>${list.length - ok}</b></div></div>
+<button onclick="print()">พิมพ์ / บันทึกเป็น PDF</button>
+<table><thead><tr><th>#</th><th>รูป</th><th>วันที่ / เวลา</th><th>รหัส</th><th>ชื่อ-นามสกุล</th><th>แผนก</th><th>ผล</th><th>สวมหน้ากาก</th></tr></thead>
+<tbody>${body || '<tr><td colspan="8">ยังไม่มีประวัติ</td></tr>'}</tbody></table></body></html>`;
   },
 };
 

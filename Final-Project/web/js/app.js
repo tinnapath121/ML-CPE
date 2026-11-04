@@ -1,9 +1,9 @@
 // app.js — ควบคุมหน้าจอทั้งหมด
 // สแกน: กล้อง -> ตรวจจับใบหน้า -> ลายใบหน้า 128 ค่า -> (1) โมเดลตรวจแมสของเรา (2) 1-NN เทียบผู้ลงทะเบียน
 // ผ่านเมื่อ: จำหน้าได้ (ระยะ < เกณฑ์) และ สวมหน้ากาก
-import { loadFaceApi, analyzeFace, distance, startCamera } from "./face.js?v=9";
-import { loadModel } from "./model.js?v=9";
-import { people, log, identify } from "./store.js?v=9";
+import { loadFaceApi, analyzeFace, distance, startCamera } from "./face.js?v=10";
+import { loadModel } from "./model.js?v=10";
+import { people, log, identify } from "./store.js?v=10";
 
 // ถ้าหา element ไม่เจอ (เช่น เบราว์เซอร์ยังจำ HTML เวอร์ชันเก่า) คืนตัวหลอกแทน null เพื่อไม่ให้ทั้งแอปพัง
 const dummy = new Proxy(function () {}, { get: (t, k) => (k === "classList" ? { toggle() {}, add() {}, remove() {} } : k === "querySelector" ? () => dummy : k === "dataset" ? {} : ""), set: () => true });
@@ -107,7 +107,7 @@ async function onScanFrame(f) {
   try { match = await identify(f.descriptor, cfg.match_threshold); }
   catch (e) { $("overlay").textContent = "เชื่อมต่อฐานข้อมูลไม่ได้: " + e.message; return; }
   const known = !!(match && match.person);
-  recent.push({ pm, id: known ? match.person.id : null, match });
+  recent.push({ pm, id: known ? match.person.id : null, match, box: f.box });
   if (recent.length > 4) recent.shift();
   $("overlay").textContent = "กำลังตรวจ…";
   $("sMask").textContent = `${(pm * 100).toFixed(0)}%`;
@@ -130,19 +130,29 @@ async function onScanFrame(f) {
   const p = recent.at(-1).match.person, dist = recent.at(-1).match.dist;
   if (!masked) {
     setResult("deny", `${p.name} — กรุณาสวมหน้ากาก`, "ต้องสวมหน้ากากอนามัยก่อนเข้าพื้นที่โรงงาน");
-    logOnce(p, "denied_no_mask", avgMask, dist);
+    logOnce(p, "denied_no_mask", avgMask, dist, recent.at(-1).box);
     return;
   }
   const t = new Date();
   setResult("ok", `ลงเวลาเข้างานสำเร็จ ✓`, `${p.name} (${p.id}) · ${t.toLocaleTimeString("th-TH")}`);
-  logOnce(p, "checked_in", avgMask, dist);
+  logOnce(p, "checked_in", avgMask, dist, recent.at(-1).box);
 }
 
-function logOnce(p, result, pm, dist) {
+// ตัดรูปหน้าย่อ 96x96 JPEG (~4-8 KB) จากกล้อง เก็บคู่กับประวัติ (ผู้ลงทะเบียนยินยอมแล้วตอนลงทะเบียน)
+function faceThumb(box) {
+  if (!box || !video.videoWidth) return null;
+  const pad = box.width * 0.25, x = Math.max(0, box.x - pad), y = Math.max(0, box.y - pad);
+  const w = Math.min(video.videoWidth - x, box.width + pad * 2), hh = Math.min(video.videoHeight - y, box.height + pad * 2);
+  const c = document.createElement("canvas"); c.width = c.height = 96;
+  c.getContext("2d").drawImage(video, x, y, w, hh, 0, 0, 96, 96);
+  const url = c.toDataURL("image/jpeg", 0.7);
+  return url.length <= 20000 ? url : null;
+}
+function logOnce(p, result, pm, dist, box) {
   const key = p.id + result, now = Date.now();
   if (now - (lastCheckin.get(key) || 0) < COOLDOWN_MS) return;
   lastCheckin.set(key, now);
-  log.add({ id: p.id, result, mask: +pm.toFixed(3), dist: +dist.toFixed(3) })
+  log.add({ id: p.id, result, mask: +pm.toFixed(3), dist: +dist.toFixed(3), photo: faceThumb(box) })
     .catch((e) => ($("modelInfo").textContent = "บันทึกประวัติไม่สำเร็จ: " + e.message));
   if (navigator.vibrate) navigator.vibrate(result === "checked_in" ? 80 : [200, 100, 200]);
 }
@@ -277,7 +287,7 @@ const download = (name, text, type) => {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob(["\ufeff" + text], { type })); a.download = name; a.click();
 };
-$("btnCsv").onclick = async () => download(`ประวัติเข้างาน_${new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" })}.csv`, await log.toCSV(), "text/csv");
+$("btnCsv").onclick = async () => download(`รายงานเข้างาน_${new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" })}.html`, await log.toReport(), "text/html");
 $("btnLogClear").onclick = async () => {
   const pin = $("logPin").value.trim();
   if (!pin) { $("logStatus").textContent = "ใส่ PIN ผู้ดูแลก่อนล้างประวัติ"; return; }
