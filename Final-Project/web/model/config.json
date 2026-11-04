@@ -1,1 +1,1 @@
-{"match_threshold": 0.55, "mask_threshold": 0.5}
+{"match_threshold": 0.55, "mask_threshold": 0.5, "mask_pass": 0.75, "hand_max": 0.25, "vote_frames": 6}

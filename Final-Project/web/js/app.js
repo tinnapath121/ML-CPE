@@ -1,9 +1,9 @@
 // app.js — ควบคุมหน้าจอทั้งหมด
 // สแกน: กล้อง -> ตรวจจับใบหน้า -> ลายใบหน้า 128 ค่า -> (1) โมเดลตรวจแมสของเรา (2) 1-NN เทียบผู้ลงทะเบียน
 // ผ่านเมื่อ: จำหน้าได้ (ระยะ < เกณฑ์) และ สวมหน้ากาก
-import { loadFaceApi, analyzeFace, distance, startCamera } from "./face.js?v=14";
-import { loadModel } from "./model.js?v=14";
-import { people, log, identify } from "./store.js?v=14";
+import { loadFaceApi, analyzeFace, distance, startCamera } from "./face.js?v=16";
+import { loadModel } from "./model.js?v=16";
+import { people, log, identify } from "./store.js?v=16";
 
 // ถ้าหา element ไม่เจอ (เช่น เบราว์เซอร์ยังจำ HTML เวอร์ชันเก่า) คืนตัวหลอกแทน null เพื่อไม่ให้ทั้งแอปพัง
 const dummy = new Proxy(function () {}, { get: (t, k) => (k === "classList" ? { toggle() {}, add() {}, remove() {} } : k === "querySelector" ? () => dummy : k === "dataset" ? {} : ""), set: () => true });
@@ -89,6 +89,7 @@ function loop() {
 }
 
 function maskProb(f) { return maskModel.predict(f.descriptor).probs.with_mask ?? 0; }
+function handProb(f) { return maskModel.predict(f.descriptor).probs.hand_cover ?? 0; }
 
 function draw(f) {
   canvas.width = video.videoWidth; canvas.height = video.videoHeight;
@@ -107,20 +108,26 @@ async function onScanFrame(f) {
   try { match = await identify(f.descriptor, cfg.match_threshold); }
   catch (e) { $("overlay").textContent = "เชื่อมต่อฐานข้อมูลไม่ได้: " + e.message; return; }
   const known = !!(match && match.person);
-  recent.push({ pm, id: known ? match.person.id : null, match, box: f.box });
-  if (recent.length > 4) recent.shift();
+  recent.push({ pm, hp: handProb(f), id: known ? match.person.id : null, match, box: f.box });
+  // โหวต 6 เฟรม (~1.5 วินาที): คนใส่แว่น+แมสคล้ายกันง่าย จึงต้องได้คนเดียวกันติดกันนานขึ้น
+  const VOTE = cfg.vote_frames ?? 6;
+  if (recent.length > VOTE) recent.shift();
   $("overlay").textContent = "กำลังตรวจ…";
   $("sMask").textContent = `${(pm * 100).toFixed(0)}%`;
   // ไม่โชว์ชื่อระหว่างตรวจ: โชว์เฉพาะหลังโหวตครบ 4 เฟรมและเป็นคนเดียวกันทุกเฟรม
   // (กันกรณีบางเฟรมเดาเป็นคนอื่น แล้วจอขึ้นชื่อคนนั้นทั้งที่ผลสุดท้ายคือ "ไม่รู้จัก")
   $("sWho").textContent = "กำลังตรวจ…";
   $("sDist").textContent = "–";
-  if (recent.length < 4) return;
+  if (recent.length < VOTE) return;
 
   // โหวต 4 เฟรมล่าสุด: ต้องได้คนเดียวกันทุกเฟรม และใช้ค่าเฉลี่ยความน่าจะเป็นแมส
   const ids = new Set(recent.map((r) => r.id));
   const avgMask = recent.reduce((s, r) => s + r.pm, 0) / recent.length;
-  const masked = avgMask >= cfg.mask_threshold;
+  // ผ่านว่า "ใส่แมส" ต้องครบ 3 ข้อ (เข้มขึ้น):
+  //  1) ค่าเฉลี่ย 4 เฟรม >= mask_pass (0.75)  2) ทุกเฟรม >= mask_threshold (0.5) ไม่มีเฟรมไหนหลุด
+  //  3) ไม่มีเฟรมไหนที่โมเดลคิดว่าเป็น "มือปิดปาก" เกิน 0.25
+  const PASS = cfg.mask_pass ?? 0.75, HAND_MAX = cfg.hand_max ?? 0.25;
+  const masked = avgMask >= PASS && recent.every((r) => r.pm >= cfg.mask_threshold) && recent.every((r) => r.hp < HAND_MAX);
   if (ids.size !== 1) return;
   const id = [...ids][0];
 
