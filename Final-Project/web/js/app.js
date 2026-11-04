@@ -1,9 +1,9 @@
 // app.js — ควบคุมหน้าจอทั้งหมด
 // สแกน: กล้อง -> ตรวจจับใบหน้า -> ลายใบหน้า 128 ค่า -> (1) โมเดลตรวจแมสของเรา (2) 1-NN เทียบผู้ลงทะเบียน
 // ผ่านเมื่อ: จำหน้าได้ (ระยะ < เกณฑ์) และ สวมหน้ากาก
-import { loadFaceApi, analyzeFace, distance, startCamera } from "./face.js?v=11";
-import { loadModel } from "./model.js?v=11";
-import { people, log, identify } from "./store.js?v=11";
+import { loadFaceApi, analyzeFace, distance, startCamera } from "./face.js?v=12";
+import { loadModel } from "./model.js?v=12";
+import { people, log, identify } from "./store.js?v=12";
 
 // ถ้าหา element ไม่เจอ (เช่น เบราว์เซอร์ยังจำ HTML เวอร์ชันเก่า) คืนตัวหลอกแทน null เพื่อไม่ให้ทั้งแอปพัง
 const dummy = new Proxy(function () {}, { get: (t, k) => (k === "classList" ? { toggle() {}, add() {}, remove() {} } : k === "querySelector" ? () => dummy : k === "dataset" ? {} : ""), set: () => true });
@@ -194,9 +194,15 @@ $("btnShot1").onclick = async () => {
   $("regStatus").textContent = "กำลังถ่าย… มองตรงเข้ากล้อง ไม่สวมหน้ากาก";
   const r = await capture("plain");
   if (r.error) { $("regStatus").textContent = r.error; return; }
+  // กันลงทะเบียนซ้ำ: บล็อกเฉพาะเมื่อ "เกือบแน่ใจ" ว่าเป็นคนเดียวกัน
+  // หน้าตรงของคนเดียวกันห่างกันราว 0.1–0.4 ส่วนต่างคนมัก > 0.55 จึงใช้ 0.40 และต้องเจอทั้ง 3 เฟรม
+  const DUP_T = 0.40;
   let dup = null;
-  try { dup = await identify(r.list[0], cfg.match_threshold); }
-  catch (e) { $("regStatus").textContent = "เชื่อมต่อฐานข้อมูลไม่ได้: " + e.message; return; }
+  try {
+    const hits = await Promise.all(r.list.map((d) => identify(d, DUP_T)));
+    const ids = hits.map((h) => h && h.person && h.person.id);
+    if (ids[0] && ids.every((x) => x === ids[0])) dup = hits[0];
+  } catch (e) { $("regStatus").textContent = "เชื่อมต่อฐานข้อมูลไม่ได้: " + e.message; return; }
   if (dup && dup.person && dup.person.id !== $("rId").value.trim()) {
     $("regStatus").textContent = `ใบหน้านี้ลงทะเบียนไว้แล้วเป็น ${dup.person.name} (${dup.person.id})`; return;
   }
