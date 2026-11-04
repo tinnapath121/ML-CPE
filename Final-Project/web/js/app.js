@@ -1,9 +1,9 @@
 // app.js — ควบคุมหน้าจอทั้งหมด
 // สแกน: กล้อง -> ตรวจจับใบหน้า -> ลายใบหน้า 128 ค่า -> (1) โมเดลตรวจแมสของเรา (2) 1-NN เทียบผู้ลงทะเบียน
 // ผ่านเมื่อ: จำหน้าได้ (ระยะ < เกณฑ์) และ สวมหน้ากาก
-import { loadFaceApi, analyzeFace, distance, startCamera, looksLikeMask } from "./face.js?v=17";
-import { loadModel } from "./model.js?v=17";
-import { people, log, identify } from "./store.js?v=17";
+import { loadFaceApi, analyzeFace, distance, startCamera, looksLikeMask } from "./face.js?v=18";
+import { loadModel } from "./model.js?v=18";
+import { people, log, identify } from "./store.js?v=18";
 
 // ถ้าหา element ไม่เจอ (เช่น เบราว์เซอร์ยังจำ HTML เวอร์ชันเก่า) คืนตัวหลอกแทน null เพื่อไม่ให้ทั้งแอปพัง
 const dummy = new Proxy(function () {}, { get: (t, k) => (k === "classList" ? { toggle() {}, add() {}, remove() {} } : k === "querySelector" ? () => dummy : k === "dataset" ? {} : ""), set: () => true });
@@ -306,6 +306,26 @@ const download = (name, text, type) => {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob(["\ufeff" + text], { type })); a.download = name; a.click();
 };
+// บันทึกไฟล์ให้ใช้ได้ทุกเบราว์เซอร์:
+//  - เบราว์เซอร์ในแอป (Messenger/Facebook/IG/LINE) มักบล็อกการดาวน์โหลด -> ใช้เมนูแชร์ของมือถือ หรือแนะนำให้เปิดใน Chrome/Safari
+//  - เบราว์เซอร์ปกติ -> ลิงก์ดาวน์โหลด (ต้องใส่ลงหน้าเว็บก่อนกด บางเบราว์เซอร์ถึงจะยอม)
+const IN_APP = /FBAN|FBAV|FB_IAB|FBIOS|Messenger|Instagram|Line\//i.test(navigator.userAgent);
+async function saveFile(blob, name) {
+  if (IN_APP) {
+    const file = new File([blob], name, { type: blob.type });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: name }); $("logStatus").textContent = "ส่งออกรายงานแล้ว"; return; }
+      catch (e) { if (e.name === "AbortError") return; }
+    }
+    $("logStatus").textContent = "เบราว์เซอร์ในแอปนี้ไม่ให้ดาวน์โหลดไฟล์ — กดเมนู ⋯ แล้วเลือก \"เปิดใน Chrome/Safari\" จากนั้นกดดาวน์โหลดรายงานอีกครั้ง";
+    return;
+  }
+  const url = URL.createObjectURL(blob);
+  const a = Object.assign(document.createElement("a"), { href: url, download: name, style: "display:none" });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  $("logStatus").textContent = "ดาวน์โหลดรายงานแล้ว: " + name;
+}
 $("btnCsv").onclick = async () => {
   const pin = $("logPin").value.trim();
   if (!pin) {   // รายงานมีรูปหน้า จึงต้องใช้ PIN ผู้ดูแล
@@ -314,9 +334,9 @@ $("btnCsv").onclick = async () => {
   }
   const b = $("btnCsv"); b.disabled = true; b.textContent = "กำลังสร้างรายงาน…";
   try {
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(await log.toExcel(pin));
-    a.download = `รายงานเข้างาน_${new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" })}.xlsx`; a.click();
+    const blob = await log.toExcel(pin);
+    const name = `รายงานเข้างาน_${new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" })}.xlsx`;
+    await saveFile(blob, name);
   } catch (e) { $("logStatus").textContent = "สร้างรายงานไม่สำเร็จ: " + e.message; }
   b.disabled = false; b.textContent = "ดาวน์โหลดรายงาน";
 };
