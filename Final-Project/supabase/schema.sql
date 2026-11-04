@@ -63,18 +63,22 @@ end $$;
 create or replace function public.identify(p_desc jsonb, p_threshold real default 0.55)
 returns table (id text, name text, dept text, distance real, kind text)
 language plpgsql stable security definer set search_path = '' as $$
-declare v extensions.vector;
+-- 1-NN + margin test: หาระยะที่ใกล้สุดของ "แต่ละคน" แล้วรับชื่อเฉพาะเมื่อ
+--   (1) คนที่ใกล้สุดต่ำกว่าเกณฑ์ และ (2) ห่างจากคนที่ใกล้อันดับ 2 อย่างน้อย 0.06
+-- กันกรณีหน้าคล้ายกันแล้วระบบจำสลับคน
+declare v extensions.vector; d1 real; d2 real; e1 text; k1 text; margin constant real := 0.06;
 begin
   if jsonb_array_length(p_desc) <> 128 then raise exception 'ลายใบหน้าต้องมี 128 ค่า'; end if;
   v := p_desc::text::extensions.vector;
+  select x.employee_id, x.dist, x.kind into e1, d1, k1 from (
+    select distinct on (t.employee_id) t.employee_id, t.kind, (t.embedding operator(extensions.<->) v)::real dist
+    from app.templates t order by t.employee_id, dist) x order by x.dist limit 1;
+  if e1 is null then return; end if;
+  select min(t.embedding operator(extensions.<->) v)::real into d2 from app.templates t where t.employee_id <> e1;
   return query
-    select case when d.dist < least(p_threshold, 0.6) then e.id end,
-           case when d.dist < least(p_threshold, 0.6) then e.name end,
-           case when d.dist < least(p_threshold, 0.6) then e.dept end,
-           d.dist::real, d.kind
-    from (select t.employee_id, t.kind, (t.embedding operator(extensions.<->) v) as dist
-          from app.templates t order by dist limit 1) d
-    join app.employees e on e.id = d.employee_id;
+    select case when ok then e.id end, case when ok then e.name end, case when ok then e.dept end, d1, k1
+    from app.employees e, (select d1 < least(p_threshold, 0.6) and (d2 is null or d2 - d1 >= margin) as ok) c
+    where e.id = e1;
 end $$;
 
 create or replace function public.log_checkin(p_id text, p_result text, p_mask real, p_distance real, p_photo text)
