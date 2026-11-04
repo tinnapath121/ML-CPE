@@ -1,9 +1,9 @@
 // app.js — ควบคุมหน้าจอทั้งหมด
 // สแกน: กล้อง -> ตรวจจับใบหน้า -> ลายใบหน้า 128 ค่า -> (1) โมเดลตรวจแมสของเรา (2) 1-NN เทียบผู้ลงทะเบียน
 // ผ่านเมื่อ: จำหน้าได้ (ระยะ < เกณฑ์) และ สวมหน้ากาก
-import { loadFaceApi, analyzeFace, distance, startCamera } from "./face.js?v=10";
-import { loadModel } from "./model.js?v=10";
-import { people, log, identify } from "./store.js?v=10";
+import { loadFaceApi, analyzeFace, distance, startCamera } from "./face.js?v=11";
+import { loadModel } from "./model.js?v=11";
+import { people, log, identify } from "./store.js?v=11";
 
 // ถ้าหา element ไม่เจอ (เช่น เบราว์เซอร์ยังจำ HTML เวอร์ชันเก่า) คืนตัวหลอกแทน null เพื่อไม่ให้ทั้งแอปพัง
 const dummy = new Proxy(function () {}, { get: (t, k) => (k === "classList" ? { toggle() {}, add() {}, remove() {} } : k === "querySelector" ? () => dummy : k === "dataset" ? {} : ""), set: () => true });
@@ -287,7 +287,15 @@ const download = (name, text, type) => {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob(["\ufeff" + text], { type })); a.download = name; a.click();
 };
-$("btnCsv").onclick = async () => download(`รายงานเข้างาน_${new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" })}.html`, await log.toReport(), "text/html");
+$("btnCsv").onclick = async () => {
+  const b = $("btnCsv"); b.disabled = true; b.textContent = "กำลังสร้างรายงาน…";
+  try {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(await log.toExcel());
+    a.download = `รายงานเข้างาน_${new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" })}.xlsx`; a.click();
+  } catch (e) { alert("สร้างรายงานไม่สำเร็จ: " + e.message); }
+  b.disabled = false; b.textContent = "ดาวน์โหลดรายงาน";
+};
 $("btnLogClear").onclick = async () => {
   const pin = $("logPin").value.trim();
   if (!pin) { $("logStatus").textContent = "ใส่ PIN ผู้ดูแลก่อนล้างประวัติ"; return; }
