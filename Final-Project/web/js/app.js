@@ -1,9 +1,9 @@
 // app.js — ควบคุมหน้าจอทั้งหมด
 // สแกน: กล้อง -> ตรวจจับใบหน้า -> ลายใบหน้า 128 ค่า -> (1) โมเดลตรวจแมสของเรา (2) 1-NN เทียบผู้ลงทะเบียน
 // ผ่านเมื่อ: จำหน้าได้ (ระยะ < เกณฑ์) และ สวมหน้ากาก
-import { loadFaceApi, analyzeFace, distance, startCamera } from "./face.js?v=12";
-import { loadModel } from "./model.js?v=12";
-import { people, log, identify } from "./store.js?v=12";
+import { loadFaceApi, analyzeFace, distance, startCamera } from "./face.js?v=13";
+import { loadModel } from "./model.js?v=13";
+import { people, log, identify } from "./store.js?v=13";
 
 // ถ้าหา element ไม่เจอ (เช่น เบราว์เซอร์ยังจำ HTML เวอร์ชันเก่า) คืนตัวหลอกแทน null เพื่อไม่ให้ทั้งแอปพัง
 const dummy = new Proxy(function () {}, { get: (t, k) => (k === "classList" ? { toggle() {}, add() {}, remove() {} } : k === "querySelector" ? () => dummy : k === "dataset" ? {} : ""), set: () => true });
@@ -111,8 +111,10 @@ async function onScanFrame(f) {
   if (recent.length > 4) recent.shift();
   $("overlay").textContent = "กำลังตรวจ…";
   $("sMask").textContent = `${(pm * 100).toFixed(0)}%`;
-  $("sWho").textContent = known ? match.person.name : "ไม่รู้จัก";
-  $("sDist").textContent = match ? match.dist.toFixed(2) : "–";
+  // ไม่โชว์ชื่อระหว่างตรวจ: โชว์เฉพาะหลังโหวตครบ 4 เฟรมและเป็นคนเดียวกันทุกเฟรม
+  // (กันกรณีบางเฟรมเดาเป็นคนอื่น แล้วจอขึ้นชื่อคนนั้นทั้งที่ผลสุดท้ายคือ "ไม่รู้จัก")
+  $("sWho").textContent = "กำลังตรวจ…";
+  $("sDist").textContent = "–";
   if (recent.length < 4) return;
 
   // โหวต 4 เฟรมล่าสุด: ต้องได้คนเดียวกันทุกเฟรม และใช้ค่าเฉลี่ยความน่าจะเป็นแมส
@@ -122,6 +124,8 @@ async function onScanFrame(f) {
   if (ids.size !== 1) return;
   const id = [...ids][0];
 
+  $("sWho").textContent = id ? recent.at(-1).match.person.name : "ไม่รู้จัก";
+  $("sDist").textContent = id ? recent.at(-1).match.dist.toFixed(2) : "–";
   if (!id) {
     setResult("warn", "ไม่พบข้อมูลในระบบ", "ยังไม่ได้ลงทะเบียน กรุณาลงทะเบียนก่อนใช้งาน",
       { label: "ไปลงทะเบียน", fn: () => show("register") });
