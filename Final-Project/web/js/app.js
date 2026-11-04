@@ -1,9 +1,9 @@
 // app.js — ควบคุมหน้าจอทั้งหมด
 // สแกน: กล้อง -> ตรวจจับใบหน้า -> ลายใบหน้า 128 ค่า -> (1) โมเดลตรวจแมสของเรา (2) 1-NN เทียบผู้ลงทะเบียน
 // ผ่านเมื่อ: จำหน้าได้ (ระยะ < เกณฑ์) และ สวมหน้ากาก
-import { loadFaceApi, analyzeFace, distance, startCamera } from "./face.js?v=13";
-import { loadModel } from "./model.js?v=13";
-import { people, log, identify } from "./store.js?v=13";
+import { loadFaceApi, analyzeFace, distance, startCamera } from "./face.js?v=14";
+import { loadModel } from "./model.js?v=14";
+import { people, log, identify } from "./store.js?v=14";
 
 // ถ้าหา element ไม่เจอ (เช่น เบราว์เซอร์ยังจำ HTML เวอร์ชันเก่า) คืนตัวหลอกแทน null เพื่อไม่ให้ทั้งแอปพัง
 const dummy = new Proxy(function () {}, { get: (t, k) => (k === "classList" ? { toggle() {}, add() {}, remove() {} } : k === "querySelector" ? () => dummy : k === "dataset" ? {} : ""), set: () => true });
@@ -298,12 +298,17 @@ const download = (name, text, type) => {
   a.href = URL.createObjectURL(new Blob(["\ufeff" + text], { type })); a.download = name; a.click();
 };
 $("btnCsv").onclick = async () => {
+  const pin = $("logPin").value.trim();
+  if (!pin) {   // รายงานมีรูปหน้า จึงต้องใช้ PIN ผู้ดูแล
+    const d = document.querySelector('[data-view="log"] details.admin'); if (d) d.open = true;
+    $("logPin").focus(); $("logStatus").textContent = "ใส่ PIN ผู้ดูแลก่อนดาวน์โหลดรายงาน (รายงานมีรูปหน้า)"; return;
+  }
   const b = $("btnCsv"); b.disabled = true; b.textContent = "กำลังสร้างรายงาน…";
   try {
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(await log.toExcel());
+    a.href = URL.createObjectURL(await log.toExcel(pin));
     a.download = `รายงานเข้างาน_${new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" })}.xlsx`; a.click();
-  } catch (e) { alert("สร้างรายงานไม่สำเร็จ: " + e.message); }
+  } catch (e) { $("logStatus").textContent = "สร้างรายงานไม่สำเร็จ: " + e.message; }
   b.disabled = false; b.textContent = "ดาวน์โหลดรายงาน";
 };
 $("btnLogClear").onclick = async () => {

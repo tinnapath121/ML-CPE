@@ -35,15 +35,15 @@ export const log = {
   add: (e) => rpc("log_checkin", { p_id: e.id, p_result: e.result, p_mask: e.mask, p_distance: e.dist, p_photo: e.photo || null }),
   clear: (pin) => rpc("clear_checkins", { p_pin: pin }),
   // รายงานประวัติเข้างานเป็นไฟล์ Excel (.xlsx) พร้อมรูปหน้าย่อฝังในเซลล์ (ใช้ ExcelJS โหลดเมื่อกดเท่านั้น)
-  async toExcel() {
-    const [rows, staff] = await Promise.all([log.all(1000), people.all().catch(() => [])]);
+  // ต้องใช้ PIN ผู้ดูแล เพราะรายงานมีรูปหน้า (ข้อมูลชีวมิติ)
+  async toExcel(pin) {
+    const rows = await rpc("report_checkins", { p_pin: pin, p_limit: 1000 });
     if (!window.ExcelJS) await new Promise((ok, bad) => {
       const sc = document.createElement("script");
       sc.src = "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js";
       sc.onload = ok; sc.onerror = () => bad(new Error("โหลดตัวสร้าง Excel ไม่สำเร็จ"));
       document.head.append(sc);
     });
-    const dept = Object.fromEntries((staff || []).map((p) => [p.id, p.dept || ""]));
     const RESULT = { checked_in: "เข้างาน", denied_no_mask: "ไม่ให้เข้า (ไม่สวมหน้ากาก)" };
     const tz = { timeZone: "Asia/Bangkok" };
     // กัน Formula injection ใน Excel (OWASP)
@@ -63,7 +63,7 @@ export const log = {
       const row = ws.addRow([i + 1, "",
         new Date(r.created_at).toLocaleDateString("en-CA", tz),
         new Date(r.created_at).toLocaleTimeString("en-GB", { ...tz, hour12: false }),
-        safe(r.id), safe(r.name), safe(dept[r.id]), RESULT[r.result] || r.result,
+        safe(r.id), safe(r.name), safe(r.dept), RESULT[r.result] || r.result,
         r.mask_prob == null ? null : +(r.mask_prob * 100).toFixed(1)]);
       row.height = 60; row.alignment = { vertical: "middle" };
       row.getCell(5).numFmt = "@";
