@@ -1,9 +1,9 @@
 // app.js — ควบคุมหน้าจอทั้งหมด
 // สแกน: กล้อง -> ตรวจจับใบหน้า -> ลายใบหน้า 128 ค่า -> (1) โมเดลตรวจแมสของเรา (2) 1-NN เทียบผู้ลงทะเบียน
 // ผ่านเมื่อ: จำหน้าได้ (ระยะ < เกณฑ์) และ สวมหน้ากาก
-import { loadFaceApi, analyzeFace, distance, startCamera, looksLikeMask } from "./face.js?v=20";
-import { loadModel } from "./model.js?v=20";
-import { people, log, identify } from "./store.js?v=20";
+import { loadFaceApi, analyzeFace, distance, startCamera, looksLikeMask } from "./face.js?v=21";
+import { loadModel } from "./model.js?v=21";
+import { people, log, identify } from "./store.js?v=21";
 
 // ถ้าหา element ไม่เจอ (เช่น เบราว์เซอร์ยังจำ HTML เวอร์ชันเก่า) คืนตัวหลอกแทน null เพื่อไม่ให้ทั้งแอปพัง
 const dummy = new Proxy(function () {}, { get: (t, k) => (k === "classList" ? { toggle() {}, add() {}, remove() {} } : k === "querySelector" ? () => dummy : k === "dataset" ? {} : ""), set: () => true });
@@ -91,7 +91,11 @@ function loop() {
 // โมเดลแยก "แมส" กับ "มือปิดปาก" ได้ไม่ดีเมื่อถ่ายมุมเงย/แสงแปลก แต่ "มือ" ต้องเป็นสีผิวเสมอ
 // ถ้าด่านสีเห็นชัดว่าสิ่งที่ปิดหน้าไม่ใช่สีผิว (ต่างจากหน้าผากมาก) ให้นับคะแนน hand_cover รวมเป็นแมส
 function nonSkinCover(f) { const c = f.cues; return !!c && !c.skinTone && c.cheekForehead > (cfg.nonskin_forehead_min ?? 80); }
+// ถ้าด่านสีเห็นชัดว่า "มีของที่ไม่ใช่สีผิวปิดปากมิด" ถือว่าใส่แมส (โมเดล MLP พลาดได้เมื่อมุมกล้อง/แสงต่างจากชุดเทรน)
+// มือ = สีผิว จึงไม่เข้าเงื่อนไขนี้ และยังถูกกันด้วยโมเดล + กฎสีผิวใน looksLikeMask
+function colorMask(f) { const c = f.cues; return nonSkinCover(f) && c.mouthCheek <= (cfg.mouth_cheek_max ?? 45); }
 function maskProb(f) {
+  if (colorMask(f)) return 1;
   const p = maskModel.predict(f.descriptor).probs;
   return nonSkinCover(f) ? (p.with_mask ?? 0) + (p.hand_cover ?? 0) : (p.with_mask ?? 0);
 }
