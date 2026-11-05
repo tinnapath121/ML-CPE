@@ -1,9 +1,9 @@
 // app.js — ควบคุมหน้าจอทั้งหมด
 // สแกน: กล้อง -> ตรวจจับใบหน้า -> ลายใบหน้า 128 ค่า -> (1) โมเดลตรวจแมสของเรา (2) 1-NN เทียบผู้ลงทะเบียน
 // ผ่านเมื่อ: จำหน้าได้ (ระยะ < เกณฑ์) และ สวมหน้ากาก
-import { loadFaceApi, analyzeFace, distance, startCamera, looksLikeMask } from "./face.js?v=19";
-import { loadModel } from "./model.js?v=19";
-import { people, log, identify } from "./store.js?v=19";
+import { loadFaceApi, analyzeFace, distance, startCamera, looksLikeMask } from "./face.js?v=20";
+import { loadModel } from "./model.js?v=20";
+import { people, log, identify } from "./store.js?v=20";
 
 // ถ้าหา element ไม่เจอ (เช่น เบราว์เซอร์ยังจำ HTML เวอร์ชันเก่า) คืนตัวหลอกแทน null เพื่อไม่ให้ทั้งแอปพัง
 const dummy = new Proxy(function () {}, { get: (t, k) => (k === "classList" ? { toggle() {}, add() {}, remove() {} } : k === "querySelector" ? () => dummy : k === "dataset" ? {} : ""), set: () => true });
@@ -88,8 +88,14 @@ function loop() {
   tick();
 }
 
-function maskProb(f) { return maskModel.predict(f.descriptor).probs.with_mask ?? 0; }
-function handProb(f) { return maskModel.predict(f.descriptor).probs.hand_cover ?? 0; }
+// โมเดลแยก "แมส" กับ "มือปิดปาก" ได้ไม่ดีเมื่อถ่ายมุมเงย/แสงแปลก แต่ "มือ" ต้องเป็นสีผิวเสมอ
+// ถ้าด่านสีเห็นชัดว่าสิ่งที่ปิดหน้าไม่ใช่สีผิว (ต่างจากหน้าผากมาก) ให้นับคะแนน hand_cover รวมเป็นแมส
+function nonSkinCover(f) { const c = f.cues; return !!c && !c.skinTone && c.cheekForehead > (cfg.nonskin_forehead_min ?? 80); }
+function maskProb(f) {
+  const p = maskModel.predict(f.descriptor).probs;
+  return nonSkinCover(f) ? (p.with_mask ?? 0) + (p.hand_cover ?? 0) : (p.with_mask ?? 0);
+}
+function handProb(f) { return nonSkinCover(f) ? 0 : (maskModel.predict(f.descriptor).probs.hand_cover ?? 0); }
 
 function draw(f) {
   canvas.width = video.videoWidth; canvas.height = video.videoHeight;
