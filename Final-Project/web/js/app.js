@@ -1,9 +1,9 @@
 // app.js — ควบคุมหน้าจอทั้งหมด
 // สแกน: กล้อง -> ตรวจจับใบหน้า -> ลายใบหน้า 128 ค่า -> (1) โมเดลตรวจแมสของเรา (2) 1-NN เทียบผู้ลงทะเบียน
 // ผ่านเมื่อ: จำหน้าได้ (ระยะ < เกณฑ์) และ สวมหน้ากาก
-import { loadFaceApi, analyzeFace, distance, startCamera, looksLikeMask } from "./face.js?v=21";
-import { loadModel } from "./model.js?v=21";
-import { people, log, identify } from "./store.js?v=21";
+import { loadFaceApi, analyzeFace, distance, startCamera, looksLikeMask } from "./face.js?v=22";
+import { loadModel } from "./model.js?v=22";
+import { people, log, identify } from "./store.js?v=22";
 
 // ถ้าหา element ไม่เจอ (เช่น เบราว์เซอร์ยังจำ HTML เวอร์ชันเก่า) คืนตัวหลอกแทน null เพื่อไม่ให้ทั้งแอปพัง
 const dummy = new Proxy(function () {}, { get: (t, k) => (k === "classList" ? { toggle() {}, add() {}, remove() {} } : k === "querySelector" ? () => dummy : k === "dataset" ? {} : ""), set: () => true });
@@ -137,8 +137,10 @@ async function onScanFrame(f) {
   //  1) ค่าเฉลี่ย 4 เฟรม >= mask_pass (0.75)  2) ทุกเฟรม >= mask_threshold (0.5) ไม่มีเฟรมไหนหลุด
   //  3) ไม่มีเฟรมไหนที่โมเดลคิดว่าเป็น "มือปิดปาก" เกิน 0.25
   const PASS = cfg.mask_pass ?? 0.75, HAND_MAX = cfg.hand_max ?? 0.25;
-  const masked = avgMask >= PASS && recent.every((r) => r.pm >= cfg.mask_threshold) && recent.every((r) => r.hp < HAND_MAX)
-    && recent.every((r) => r.cov);   // 4) ด่านสี: ปากต้องถูกปิด และไม่ใช่เสื้อที่ดึงขึ้นมาปิด
+  // ใช้เสียงข้างมาก (เช่น 4 ใน 5 เฟรม) แทน "ทุกเฟรม" — เฟรมเบลอ/หันหน้า 1 เฟรมจะไม่ทำให้ตกทั้งรอบ
+  const NEED = Math.ceil(recent.length * (cfg.vote_ratio ?? 0.7));
+  const okFrames = recent.filter((r) => r.pm >= cfg.mask_threshold && r.hp < HAND_MAX && r.cov).length;
+  const masked = avgMask >= PASS && okFrames >= NEED;
   if (ids.size !== 1) return;
   const id = [...ids][0];
 

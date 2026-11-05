@@ -93,7 +93,8 @@ function coverCues(ctx, P, B) {
   const C1 = mean(l.x, l.y, s, s), C2 = mean(r.x, r.y, s, s), C = C1.map((v, i) => (v + C2[i]) / 2);
   const N = mean(P[8].x, P[8].y + fh * 0.2, fw * 0.3, fh * 0.12);
   const F = mean((P[19].x + P[24].x) / 2, Math.min(P[19].y, P[24].y) - fh * 0.08, fw * 0.25, fh * 0.06);
-  const skinTone = C[0] - C[1] > 12 && C[0] - C[2] > 20;   // โทนผิว: แดง > เขียว > น้ำเงิน
+  // โทนผิว: แดงนำเขียวและน้ำเงินชัด (เกณฑ์สูงขึ้น เพื่อไม่ให้แมสขาวใต้ไฟสีส้มถูกนับเป็นสีผิว)
+  const skinTone = C[0] - C[1] > 18 && C[0] - C[2] > 30;
   return { mouthCheek: dist(M, C), cheekNeck: dist(C, N), cheekForehead: dist(C, F), skinTone };
 }
 
