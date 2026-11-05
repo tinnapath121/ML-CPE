@@ -102,7 +102,8 @@ export function looksLikeMask(cues, cfg = {}) {
   if (!cues) return true;
   const mouthMax = cfg.mouth_cheek_max ?? 25, neckMin = cfg.cheek_neck_min ?? 30, foreMax = cfg.cheek_forehead_max ?? 60;
   if (cues.mouthCheek > mouthMax) return false;                                  // ปากโผล่ (เช่น แผ่นมาสก์หน้า)
-  if (cues.cheekNeck < neckMin && cues.cheekForehead > foreMax) return false;    // ต่อเนื่องกับเสื้อ
+  // กฎเสื้อ: ปิดได้ด้วย cheek_neck_min = 0 (ตอนนี้ปิดไว้ เพราะทำให้แมสสีเดียวกับเสื้อไม่ผ่าน)
+  if (neckMin > 0 && cues.cheekNeck < neckMin && cues.cheekForehead > foreMax) return false;    // ต่อเนื่องกับเสื้อ
   if (cues.skinTone && cues.cheekForehead < (cfg.skin_forehead_max ?? 40)) return false; // ที่ปิดเป็นสีผิวเหมือนหน้าผาก = มือ/ผิว
   return true;
 }

@@ -165,11 +165,11 @@ end $$;
 revoke all on function public.list_checkins(int), public.report_checkins(text,int) from public;
 grant execute on function public.list_checkins(int), public.report_checkins(text,int) to anon, authenticated;
 
--- ===== อัปเดต v16: จำหน้าเข้มขึ้น (คนใส่แว่น+แมสคล้ายกัน) =====
+-- ===== อัปเดต v16 (v19: เกณฑ์ใส่แมสผ่อนเป็น 0.51): จำหน้าเข้มขึ้น (คนใส่แว่น+แมสคล้ายกัน) =====
 create or replace function public.identify(p_desc jsonb, p_threshold real default 0.55)
 returns table (id text, name text, dept text, distance real, kind text)
 language plpgsql stable security definer set search_path = '' as $$
--- คะแนนแต่ละคน = เฉลี่ยระยะของ template ใกล้สุด 2 อัน · เกณฑ์ใส่แมส 0.38 / หน้าเปล่า 0.50 · ต้องห่างคนอันดับ 2 ≥ 0.10
+-- คะแนนแต่ละคน = เฉลี่ยระยะของ template ใกล้สุด 2 อัน · เกณฑ์ใส่แมส 0.51 / หน้าเปล่า 0.50 · ต้องห่างคนอันดับ 2 ≥ 0.10
 declare v extensions.vector; d1 real; d2 real; e1 text; k1 text; thr real; margin constant real := 0.10;
 begin
   if jsonb_array_length(p_desc) <> 128 then raise exception 'ลายใบหน้าต้องมี 128 ค่า'; end if;
@@ -184,7 +184,7 @@ begin
                     row_number() over (partition by t.employee_id order by t.embedding operator(extensions.<->) v) rn
              from app.templates t where t.employee_id <> e1)
   select min(sc) into d2 from (select avg(dist)::real sc from d where rn <= 2 group by e) z;
-  thr := case when k1 = 'masked' then least(p_threshold, 0.38) else least(p_threshold, 0.50) end;
+  thr := case when k1 = 'masked' then least(p_threshold, 0.51) else least(p_threshold, 0.50) end;
   return query
     select case when ok then e.id end, case when ok then e.name end, case when ok then e.dept end, d1, k1
     from app.employees e, (select d1 < thr and (d2 is null or d2 - d1 >= margin) as ok) c
